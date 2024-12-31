@@ -8,8 +8,8 @@ class User(AbstractUser):
     phone = models.CharField(max_length=15, blank=True)
     cpf = models.CharField(max_length=14, unique=True)
 
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['username', 'cpf']
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = ["username", "cpf"]
 
     def __str__(self):
         return self.email
@@ -17,22 +17,65 @@ class User(AbstractUser):
 class Reservoir(models.Model):
     name = models.CharField(max_length=255, unique=True)
     coordinates = models.TextField()
-    users = models.ManyToManyField(User, related_name='reservoirs')
-    created_at = models.DateTimeField(auto_now_add=True)                
+    created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE)
 
     def __str__(self):
         return self.name
 
+class ReservoirUsers(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reservoir_accesses')
+    reservoir = models.ForeignKey(Reservoir, on_delete=models.CASCADE, related_name='user_accesses')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ['user', 'reservoir']
+
+    def __str__(self):
+        return f"{self.user.email} - {self.reservoir.name}"
+
 class WaterQualityAnalysis(models.Model):
     reservoir = models.ForeignKey(Reservoir, on_delete=models.CASCADE, related_name='analyses')
-    parameter = models.CharField(max_length=50)
+    identifier_code = models.UUIDField(unique=True)
     analysis_start_date = models.DateField()
     analysis_end_date = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"{self.reservoir.name} - {self.analysis_start_date}"
+
+class Parameter(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.name
+
+class WaterQualityAnalysisParameters(models.Model):
+    water_quality_analysis = models.ForeignKey(
+        WaterQualityAnalysis, 
+        on_delete=models.CASCADE,
+        related_name='parameters'
+    )
+    parameter = models.ForeignKey(
+        Parameter, 
+        on_delete=models.CASCADE,
+        related_name='analysis_results'
+    )
     min_value = models.FloatField()
     max_value = models.FloatField()
     raster_path = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ['water_quality_analysis', 'parameter']
 
     def __str__(self):
-        return f"{self.reservoir.name} - {self.parameter} - {self.analysis_start_date}"
+        return f"{self.water_quality_analysis.reservoir.name} - {self.parameter.name}"
