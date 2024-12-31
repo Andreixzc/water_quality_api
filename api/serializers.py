@@ -1,16 +1,16 @@
 from rest_framework import serializers
 from .models import User, Reservoir, WaterQualityAnalysis
 from django.contrib.auth.password_validation import validate_password
-from .models import User
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
 
     class Meta:
         model = User
-        fields = ['id', 'email', 'username', 'password', 'cpf', 'company', 'phone', 'is_admin']
+        fields = ['id', 'email', 'username', 'password', 'cpf', 'company', 'phone', 'is_staff']  # Changed is_admin to is_staff
         extra_kwargs = {
-            'password': {'write_only': True}
+            'password': {'write_only': True},
+            'is_staff': {'read_only': True}  # Added this to prevent setting is_staff via API
         }
 
     def create(self, validated_data):

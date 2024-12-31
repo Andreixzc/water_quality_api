@@ -1,18 +1,19 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.contrib.auth.hashers import make_password
+
 class User(AbstractUser):
     email = models.EmailField(unique=True)
     company = models.CharField(max_length=255, blank=True)
     phone = models.CharField(max_length=15, blank=True)
     cpf = models.CharField(max_length=14, unique=True)
-    is_admin = models.BooleanField(default=False)
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username', 'cpf']
 
     def __str__(self):
         return self.email
+
 class Reservoir(models.Model):
     name = models.CharField(max_length=255, unique=True)
     coordinates = models.TextField()
