@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Water Quality Map</title>
+</head>
+<body>
+    <h1>Water Quality Analysis Map</h1>
+    <div id="map-container"></div>
+
+    <script>
+        async function loadMap() {
+            try {
+                const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM1Nzk2ODk4LCJpYXQiOjE3MzU3OTMyOTgsImp0aSI6ImFhNzQ3ZTAzNjUxOTQxZDNhODNlMGE5ZWQyM2ZhZWQwIiwidXNlcl9pZCI6MX0.pPAkEda-Ka_NlGcH1jdJ_FUXLRzg6YWSQo-tSpflGgU'
+                console.log('Starting request...');
+                const response = await fetch('http://localhost:8000/api/analyses/get_intensity_map/?reservoir=Cacu&date=2024-01-01&parameter=Turbidity', {
+                    method: 'GET',
+                    mode: 'cors', // Enable CORS
+                    credentials: 'include', // Include credentials
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                });
+
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Response error:', errorText);
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+                }
+
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                // Insert the map HTML into the container
+                document.getElementById('map-container').innerHTML = data.map_html;
+                
+                // Add metadata display
+                const metadata = `
+                    <div style="margin-top: 20px">
+                        <h3>Analysis Details:</h3>
+                        <p>Parameter: ${data.parameter}</p>
+                        <p>Min Value: ${data.min_value}</p>
+                        <p>Max Value: ${data.max_value}</p>
+                        <p>Date: ${data.analysis_date}</p>
+                        <p>Reservoir: ${data.reservoir}</p>
+                    </div>
+                `;
+                
+                document.getElementById('map-container').insertAdjacentHTML('afterend', metadata);
+                
+            } catch (error) {
+                console.error('Error details:', error);
+                document.getElementById('map-container').innerHTML = `Error loading map: ${error.message}`;
+            }
+        }
+
+        // Load the map when the page loads
+        loadMap();
+    </script>
+</body>
+</html>

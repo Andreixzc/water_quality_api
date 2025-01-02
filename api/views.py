@@ -90,18 +90,17 @@ class WaterQualityAnalysisViewSet(viewsets.ModelViewSet):
         reservoir = analysis_param.water_quality_analysis.reservoir
         coordinates_json = reservoir.coordinates
 
-        # Generate map
         try:
-            map_obj = generate_intensity_map(
+            map_html = generate_intensity_map(
                 coordinates_json=coordinates_json,
                 raster_path=analysis_param.raster_path,
                 min_value=analysis_param.min_value,
                 max_value=analysis_param.max_value,
-                parameter_name=parameter_name  # Added parameter name for the legend
+                parameter_name=parameter_name
             )
             
             return Response({
-                "map_html": map_obj.to_html(),
+                "map_html": map_html,
                 "parameter": parameter_name,
                 "min_value": analysis_param.min_value,
                 "max_value": analysis_param.max_value,
@@ -111,8 +110,10 @@ class WaterQualityAnalysisViewSet(viewsets.ModelViewSet):
             
         except Exception as e:
             return Response({"error": str(e)}, status=500)
-
 # You might also want to add an endpoint to get available parameters
+
+
+
 @action(detail=False, methods=['get'])
 def get_parameters(self, request):
     """Get list of available parameters for analysis."""
