@@ -1,7 +1,9 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.contrib.auth.hashers import make_password
-
+from django.core.validators import FileExtensionValidator
+import os
+from django.conf import settings
 class User(AbstractUser):
     email = models.EmailField(unique=True)
     company = models.CharField(max_length=255, blank=True)
@@ -78,3 +80,21 @@ class WaterQualityAnalysisParameters(models.Model):
 
     def __str__(self):
         return f"{self.water_quality_analysis.reservoir.name} - {self.parameter.name}"
+    
+
+
+class ReservoirParameterModel(models.Model):
+    reservoir = models.ForeignKey('Reservoir', on_delete=models.CASCADE, related_name='parameter_models')
+    parameter = models.ForeignKey('Parameter', on_delete=models.CASCADE, related_name='reservoir_models')
+    model_filename = models.CharField(max_length=255)
+    scaler_filename = models.CharField(max_length=255)
+    model_path = models.CharField(max_length=512)
+    scaler_path = models.CharField(max_length=512)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ['reservoir', 'parameter']
+
+    def __str__(self):
+        return f"{self.reservoir.name} - {self.parameter.name} Model"

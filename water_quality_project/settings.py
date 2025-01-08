@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -162,3 +163,12 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost",
     "http://127.0.0.1",
 ]
+
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MODELS_DIR = os.path.join(BASE_DIR, 'ml_models')
+SCALERS_DIR = os.path.join(BASE_DIR, 'ml_scalers')
+
+# Ensure these directories exist
+os.makedirs(MODELS_DIR, exist_ok=True)
+os.makedirs(SCALERS_DIR, exist_ok=True)

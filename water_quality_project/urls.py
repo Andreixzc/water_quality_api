@@ -7,7 +7,8 @@ from api.views import (
     WaterQualityAnalysisViewSet,
     ParameterViewSet,
     ReservoirUsersViewSet,
-    WaterQualityAnalysisParametersViewSet
+    WaterQualityAnalysisParametersViewSet,
+    ReservoirParameterModelViewSet  # Add this import
 )
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework.permissions import AllowAny
@@ -19,6 +20,7 @@ router.register(r'analyses', WaterQualityAnalysisViewSet)
 router.register(r'parameters', ParameterViewSet)
 router.register(r'reservoir-users', ReservoirUsersViewSet)
 router.register(r'analysis-parameters', WaterQualityAnalysisParametersViewSet)
+router.register(r'reservoir-parameter-models', ReservoirParameterModelViewSet)  # Add this line
 
 urlpatterns = [
     path('admin/', admin.site.urls),

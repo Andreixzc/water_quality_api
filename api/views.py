@@ -1,4 +1,7 @@
 from rest_framework import viewsets
+from rest_framework import viewsets
+from .models import ReservoirParameterModel
+from .serializers import ReservoirParameterModelSerializer
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from datetime import datetime
@@ -37,6 +40,13 @@ class ReservoirViewSet(viewsets.ModelViewSet):
     queryset = Reservoir.objects.all()
     serializer_class = ReservoirSerializer
     permission_classes = [IsAuthenticated]
+
+    @action(detail=True, methods=['get'])
+    def parameter_models(self, request, pk=None):
+        reservoir = self.get_object()
+        parameter_models = reservoir.parameter_models.all()
+        serializer = ReservoirParameterModelSerializer(parameter_models, many=True)
+        return Response(serializer.data)
 
 class WaterQualityAnalysisViewSet(viewsets.ModelViewSet):
     queryset = WaterQualityAnalysis.objects.all()
@@ -134,3 +144,10 @@ class WaterQualityAnalysisParametersViewSet(viewsets.ModelViewSet):
     queryset = WaterQualityAnalysisParameters.objects.all()
     serializer_class = WaterQualityAnalysisParametersSerializer
     permission_classes = [IsAuthenticated]
+
+
+
+class ReservoirParameterModelViewSet(viewsets.ModelViewSet):
+    queryset = ReservoirParameterModel.objects.all()
+    serializer_class = ReservoirParameterModelSerializer
+    permission_classes = [IsAuthenticated]  # Adjust permissions as needed
