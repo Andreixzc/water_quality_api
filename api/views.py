@@ -3,8 +3,19 @@ from rest_framework import viewsets
 from .models import ReservoirParameterModel
 from .serializers import ReservoirParameterModelSerializer
 from rest_framework.decorators import action
+from django.conf import settings
+import os
 from rest_framework.response import Response
-from datetime import datetime
+from rest_framework import status
+from datetime import datetime, timedelta
+from .water_quality_processor import WaterQualityProcessor
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework import status
+from datetime import datetime, timedelta
+import os
+from django.conf import settings
+import uuid
 from .utils import generate_intensity_map
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 import ee
@@ -53,76 +64,115 @@ class WaterQualityAnalysisViewSet(viewsets.ModelViewSet):
     serializer_class = WaterQualityAnalysisSerializer
     permission_classes = [IsAuthenticated]
 
-    @action(detail=False, methods=['get'])
-    def get_intensity_map(self, request):
-        """
-        Get intensity map for a specific reservoir, date and parameter.
-        Query params:
-            - reservoir: name of the reservoir
-            - date: date in YYYY-MM-DD format
-            - parameter: name of the parameter (e.g., 'Turbidity', 'Chlorophyll')
-        """
-        # Get query parameters
-        reservoir_name = request.query_params.get('reservoir')
-        date_str = request.query_params.get('date')
-        parameter_name = request.query_params.get('parameter')
-        
-        # Validate required parameters
-        if not all([reservoir_name, date_str, parameter_name]):
-            return Response({
-                "error": "reservoir, date and parameter are required",
-                "example": "/api/analyses/get_intensity_map/?reservoir=Furnas&date=2024-01-01&parameter=Turbidity"
-            }, status=400)
-        
-        try:
-            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-        except ValueError:
-            return Response({"error": "Invalid date format. Use YYYY-MM-DD"}, status=400)
+    @action(detail=False, methods=['post'])
+    def generate_analysis(self, request):
+        reservoir_id = request.data.get('reservoir_id')
+        parameter_ids = request.data.get('parameter_ids', [])
+        start_date = request.data.get('start_date')
+        end_date = request.data.get('end_date')
 
-        # Get analysis data from database
-        analysis_param = WaterQualityAnalysisParameters.objects.select_related(
-            'water_quality_analysis__reservoir',
-            'parameter'
-        ).filter(
-            water_quality_analysis__reservoir__name=reservoir_name,
-            water_quality_analysis__analysis_start_date__lte=target_date,
-            water_quality_analysis__analysis_end_date__gte=target_date,
-            parameter__name=parameter_name
-        ).first()
-
-        if not analysis_param:
-            return Response({
-                "error": f"No analysis found for reservoir '{reservoir_name}' on date '{date_str}' for parameter '{parameter_name}'",
-                "available_parameters": list(Parameter.objects.values_list('name', flat=True))
-            }, status=404)
-
-        # Get reservoir coordinates
-        reservoir = analysis_param.water_quality_analysis.reservoir
-        coordinates_json = reservoir.coordinates
+        if not all([reservoir_id, parameter_ids, start_date, end_date]):
+            return Response({"error": "Missing required parameters"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            map_html = generate_intensity_map(
-                coordinates_json=coordinates_json,
-                raster_path=analysis_param.raster_path,
-                min_value=analysis_param.min_value,
-                max_value=analysis_param.max_value,
-                parameter_name=parameter_name
-            )
-            
-            return Response({
-                "map_html": map_html,
-                "parameter": parameter_name,
-                "min_value": analysis_param.min_value,
-                "max_value": analysis_param.max_value,
-                "analysis_date": target_date,
-                "reservoir": reservoir_name
-            })
-            
-        except Exception as e:
-            return Response({"error": str(e)}, status=500)
-# You might also want to add an endpoint to get available parameters
+            reservoir = Reservoir.objects.get(id=reservoir_id)
+            parameters = Parameter.objects.filter(id__in=parameter_ids)
+            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+        except (Reservoir.DoesNotExist, Parameter.DoesNotExist, ValueError):
+            return Response({"error": "Invalid reservoir, parameter, or date format"}, status=status.HTTP_400_BAD_REQUEST)
 
+        results = []
+        for parameter in parameters:
+            try:
+                reservoir_parameter_model = ReservoirParameterModel.objects.get(
+                    reservoir=reservoir,
+                    parameter=parameter
+                )
 
+                model_path = os.path.join(settings.MODELS_DIR, reservoir_parameter_model.model_filename)
+                scaler_path = os.path.join(settings.SCALERS_DIR, reservoir_parameter_model.scaler_filename)
+
+                processor = WaterQualityProcessor(
+                    model_path=model_path,
+                    scaler_path=scaler_path
+                )
+
+                output_dir = os.path.join(settings.MEDIA_ROOT, 'reservoir_analyses', reservoir.name, parameter.name)
+                os.makedirs(output_dir, exist_ok=True)
+
+                output_tiff, stats_path = processor.process_reservoir(
+                    reservoir_name=reservoir.name,
+                    aoi=reservoir.coordinates,
+                    date_range=[start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d')],
+                    parameter_name=parameter.name,
+                    output_dir=output_dir
+                )
+
+                with open(stats_path, 'r') as f:
+                    stats = f.read().splitlines()
+                min_value = float(stats[3].split(': ')[1])
+                max_value = float(stats[4].split(': ')[1])
+
+                map_html = generate_intensity_map(
+                    coordinates_json=reservoir.coordinates,
+                    raster_path=output_tiff,
+                    min_value=min_value,
+                    max_value=max_value,
+                    parameter_name=parameter.name
+                )
+
+                map_filename = f"{os.path.splitext(os.path.basename(output_tiff))[0]}_map.html"
+                map_path = os.path.join(output_dir, map_filename)
+                with open(map_path, 'w') as f:
+                    f.write(map_html)
+
+                water_quality_analysis, created = WaterQualityAnalysis.objects.update_or_create(
+                    reservoir=reservoir,
+                    analysis_start_date=start_date,
+                    analysis_end_date=end_date,
+                    defaults={
+                        'identifier_code': uuid.uuid4(),
+                        'created_by': request.user
+                    }
+                )
+
+                analysis_param, created = WaterQualityAnalysisParameters.objects.update_or_create(
+                    water_quality_analysis=water_quality_analysis,
+                    parameter=parameter,
+                    defaults={
+                        'min_value': min_value,
+                        'max_value': max_value,
+                        'raster_path': output_tiff,
+                        'intensity_map_path': map_path
+                    }
+                )
+
+                results.append({
+                    "reservoir": reservoir.name,
+                    "parameter": parameter.name,
+                    "analysis_start_date": start_date,
+                    "analysis_end_date": end_date,
+                    "raster_path": output_tiff,
+                    "intensity_map_path": map_path,
+                    "min_value": min_value,
+                    "max_value": max_value
+                })
+
+            except ReservoirParameterModel.DoesNotExist:
+                results.append({
+                    "reservoir": reservoir.name,
+                    "parameter": parameter.name,
+                    "error": "No model found for this reservoir-parameter combination"
+                })
+            except Exception as e:
+                results.append({
+                    "reservoir": reservoir.name,
+                    "parameter": parameter.name,
+                    "error": str(e)
+                })
+
+        return Response(results)
 
 @action(detail=False, methods=['get'])
 def get_parameters(self, request):

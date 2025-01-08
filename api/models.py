@@ -72,6 +72,7 @@ class WaterQualityAnalysisParameters(models.Model):
     min_value = models.FloatField()
     max_value = models.FloatField()
     raster_path = models.CharField(max_length=255)
+    intensity_map_path = models.CharField(max_length=255, null=True, blank=True)  # New field
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
