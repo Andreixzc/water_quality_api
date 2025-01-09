@@ -90,19 +90,17 @@ class WaterQualityAnalysisViewSet(viewsets.ModelViewSet):
                     parameter=parameter
                 )
 
-                model_path = os.path.join(settings.MODELS_DIR, reservoir_parameter_model.model_filename)
-                scaler_path = os.path.join(settings.SCALERS_DIR, reservoir_parameter_model.scaler_filename)
-
                 processor = WaterQualityProcessor(
-                    model_path=model_path,
-                    scaler_path=scaler_path
+                    model_path=reservoir_parameter_model.model_path,
+                    scaler_path=reservoir_parameter_model.scaler_path
                 )
 
                 output_dir = os.path.join(settings.MEDIA_ROOT, 'reservoir_analyses', reservoir.name, parameter.name)
                 os.makedirs(output_dir, exist_ok=True)
+
                 date_results = processor.process_reservoir(
                     reservoir_name=reservoir.name,
-                    aoi_coords=reservoir.coordinates,  # Pass coordinates directly
+                    coordinates=reservoir.coordinates,
                     start_date=start_date.strftime('%Y-%m-%d'),
                     end_date=end_date.strftime('%Y-%m-%d'),
                     parameter_name=parameter.name,
@@ -123,9 +121,10 @@ class WaterQualityAnalysisViewSet(viewsets.ModelViewSet):
                         parameter_name=parameter.name
                     )
 
+                    # Save the HTML content to a file
                     map_filename = f"{os.path.splitext(os.path.basename(output_tiff))[0]}_map.html"
                     map_path = os.path.join(output_dir, map_filename)
-                    with open(map_path, 'w') as f:
+                    with open(map_path, 'w', encoding='utf-8') as f:
                         f.write(map_html)
 
                     water_quality_analysis, created = WaterQualityAnalysis.objects.update_or_create(

@@ -88,12 +88,11 @@ class WaterQualityProcessor:
         
         return final_image
 
-    def process_reservoir(self, reservoir_name, aoi_coords, start_date, end_date, parameter_name, output_dir='outputs'):
+    def process_reservoir(self, reservoir_name, coordinates, start_date, end_date, parameter_name, output_dir='outputs'):
         """Process a reservoir for all available dates in the given range"""
-        print("Original AOI coordinates:", aoi_coords)
         
         # Convert the coordinates to an Earth Engine Geometry
-        aoi = ee.Geometry.Polygon([aoi_coords])
+        aoi = ee.Geometry.Polygon([coordinates])
         print("Converted AOI:", aoi.getInfo())
 
         os.makedirs(output_dir, exist_ok=True)
