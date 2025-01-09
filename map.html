@@ -10,7 +10,7 @@
     <script>
         async function loadMap() {
             try {
-                const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM2MTg5Mzc5LCJpYXQiOjE3MzYxODU3NzksImp0aSI6IjU3YjA4MGNjYzE0MTQzYmNiZmU4MzRhY2QwMGMyNTA4IiwidXNlcl9pZCI6MX0.Va-BzRAI6pPpLgF27yijhJroa-dyEg7q8NPQmGu3VGg'
+                const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM2NDAwNTEyLCJpYXQiOjE3MzYzOTY5MTIsImp0aSI6IjA3ZDcxNmIxNjg2OTRhYzY4Yzc0ZDdkZmZjNGRkYmJkIiwidXNlcl9pZCI6MX0.iYakCgT2C_IZrYBwWZyHFTFAH3sHqsIAhlOkz6VImII'
                 console.log('Starting request...');
                 const response = await fetch('http://localhost:8000/api/analyses/get_intensity_map/?reservoir=Cacu&date=2024-01-01&parameter=Turbidity', {
                     method: 'GET',
