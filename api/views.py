@@ -118,7 +118,8 @@ class WaterQualityAnalysisViewSet(viewsets.ModelViewSet):
                         raster_path=output_tiff,
                         min_value=min_value,
                         max_value=max_value,
-                        parameter_name=parameter.name
+                        parameter_name=parameter.name,
+                        date = date
                     )
 
                     # Save the HTML content to a file
