@@ -8,6 +8,7 @@ import threading
 from threading import Lock
 import rasterio
 from rasterio.merge import merge
+import glob
 
 class WaterQualityProcessor:
     def __init__(self, model_path, scaler_path):
@@ -162,14 +163,12 @@ class WaterQualityProcessor:
             raise ValueError(f"No valid data for date {date}")
         
         output_filename = f"{reservoir_name}_{date}_{parameter_name}.tif"
-        output_path = os.path.join(output_dir, output_filename)
-        
-        self.merge_tiff_files(output_dir, f'Tile_{date}', output_path)
+        merged_output_path = self.merge_tiff_files(output_dir, f'Tile_{date}', output_filename)
         
         stats_filename = f"{reservoir_name}_{date}_{parameter_name}_stats.txt"
-        stats_path = os.path.join(output_dir, stats_filename)
+        stats_path = os.path.join(output_dir, "merged", stats_filename)
         
-        with rasterio.open(output_path) as src:
+        with rasterio.open(merged_output_path) as src:
             data = src.read(1)
             valid_data = data[data != -9999]
             min_value = np.min(valid_data)
@@ -182,43 +181,63 @@ class WaterQualityProcessor:
             f.write(f"Minimum value: {min_value}\n")
             f.write(f"Maximum value: {max_value}\n")
         
-        return output_path, stats_path
+        return merged_output_path, stats_path
 
     def merge_tiff_files(self, directory, pattern, output_file):
         """Merge multiple TIFF files into a single file"""
-        tiff_files = [os.path.join(directory, f) for f in os.listdir(directory) 
-                    if f.startswith(pattern) and f.endswith('.tif')]
-        
-        if not tiff_files:
+        # Create a subdirectory for merged files if it doesn't exist
+        merged_dir = os.path.join(directory, "merged")
+        os.makedirs(merged_dir, exist_ok=True)
+
+        # Get a list of all .tif files in the directory that match the pattern
+        tif_files = glob.glob(os.path.join(directory, f'{pattern}*.tif'))
+
+        print("Merging tiff files:")
+        for file in tif_files:
+            print(file)
+
+        if not tif_files:
             raise ValueError("No TIFF files found to merge")
-        
+
+        # Open all the tif files
         src_files_to_mosaic = []
+        for tif in tif_files:
+            src = rasterio.open(tif)
+            src_files_to_mosaic.append(src)
+
         try:
-            for tiff in tiff_files:
-                src = rasterio.open(tiff)
-                src_files_to_mosaic.append(src)
-            
+            # Merge the tif files
             mosaic, out_trans = merge(src_files_to_mosaic)
-            
+
+            # Copy the metadata from the first file
             out_meta = src_files_to_mosaic[0].meta.copy()
+
+            # Update the metadata
             out_meta.update({
+                "driver": "GTiff",
                 "height": mosaic.shape[1],
                 "width": mosaic.shape[2],
                 "transform": out_trans,
-                "nodata": -9999
             })
-            
-            with rasterio.open(output_file, "w", **out_meta) as dest:
+
+            # Write the merged file to the merged subdirectory
+            merged_output_file = os.path.join(merged_dir, output_file)
+            with rasterio.open(merged_output_file, "w", **out_meta) as dest:
                 dest.write(mosaic)
-            
-            return tiff_files
+
+            print(f"Merged TIFF file created: {merged_output_file}")
+
         finally:
+            # Close the input files
             for src in src_files_to_mosaic:
                 src.close()
-            
-            # Cleanup temporary files
-            for file in tiff_files:
-                try:
-                    os.remove(file)
-                except Exception as e:
-                    print(f"Error deleting {file}: {str(e)}")
+
+        # Delete the original tile TIFs
+        for tif in tif_files:
+            try:
+                #os.remove(tif)
+                print(f"Deleted tile file: {tif}")
+            except Exception as e:
+                print(f"Error deleting {tif}: {str(e)}")
+
+        return merged_output_file
