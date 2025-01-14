@@ -26,23 +26,31 @@ class WaterQualityProcessor:
                             'B3_B2_ratio', 'B4_B3_ratio', 'B5_B4_ratio', 'Month', 'Season']
 
     def process_tile(self, tile_geometry, date):
-        """Process a single tile of the area of interest for a specific date"""
+        """Process a single tile of the area of interest"""
+        # Criar uma collection de 1 dia
+        start_date = ee.Date(date)
+        end_date = start_date.advance(1, 'day')
+        
+        # Sentinel-2 collection for tile
         sentinel2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED') \
             .filterBounds(tile_geometry) \
-            .filterDate(date, ee.Date(date).advance(1, 'day')) \
-            .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20))
+            .filterDate(start_date, end_date)
         
         if sentinel2.size().getInfo() == 0:
             return None
-
-        image = sentinel2.first().clip(tile_geometry)
         
+        # Usar median() mesmo com uma imagem para manter a lógica que funciona
+        image = sentinel2.median().clip(tile_geometry)
+        
+        # Select bands of interest
         bands = ['B2', 'B3', 'B4', 'B5', 'B8', 'B11']
         image = image.select(bands)
         
+        # Create water mask
         MNDWI = image.normalizedDifference(['B3', 'B11']).rename('MNDWI')
         water_mask = MNDWI.gt(0.3)
         
+        # Calculate indices
         NDCI = image.normalizedDifference(['B5', 'B4']).rename('NDCI')
         NDVI = image.normalizedDifference(['B8', 'B4']).rename('NDVI')
         FAI = image.expression(
@@ -57,17 +65,21 @@ class WaterQualityProcessor:
             }
         ).rename('FAI')
         
+        # Calculate band ratios
         B3_B2_ratio = image.select('B3').divide(image.select('B2')).rename('B3_B2_ratio')
         B4_B3_ratio = image.select('B4').divide(image.select('B3')).rename('B4_B3_ratio')
         B5_B4_ratio = image.select('B5').divide(image.select('B4')).rename('B5_B4_ratio')
         
-        image_date = ee.Date(image.get('system:time_start'))
+        # Get date information
+        image_date = ee.Date(start_date)
         month = ee.Image.constant(image_date.get('month')).rename('Month')
         season = ee.Image.constant(image_date.get('month').add(2).divide(3).floor().add(1)).rename('Season')
         
+        # Combine all features
         image_with_indices = image.addBands([NDCI, NDVI, FAI, B3_B2_ratio, B4_B3_ratio, 
                                            B5_B4_ratio, month, season])
         
+        # Create scaled bands
         scaled_bands = []
         for i, name in enumerate(self.feature_names):
             scaled_band = image_with_indices.select(name) \
@@ -76,8 +88,10 @@ class WaterQualityProcessor:
                 .rename(f'scaled_{name}')
             scaled_bands.append(scaled_band)
         
+        # Combine scaled bands
         scaled_image = ee.Image.cat(scaled_bands)
         
+        # Create prediction
         weighted_bands = []
         for i, (name, importance) in enumerate(zip(self.feature_names, self.model.feature_importances_)):
             weighted_band = scaled_image.select(f'scaled_{name}').multiply(ee.Number(importance))
@@ -85,31 +99,32 @@ class WaterQualityProcessor:
         
         predicted_image = ee.Image.cat(weighted_bands).reduce(ee.Reducer.sum()).rename('parameter_pred')
         
+        # Usar where em vez de updateMask para manter a lógica que funciona
         final_image = predicted_image.where(water_mask.Not(), ee.Image.constant(-9999))
         
         return final_image
 
     def process_reservoir(self, reservoir_name, coordinates, start_date, end_date, parameter_name, output_dir='outputs'):
         """Process a reservoir for all available dates in the given range"""
-        
         # Convert the coordinates to an Earth Engine Geometry
         aoi = ee.Geometry.Polygon([coordinates])
         print("Converted AOI:", aoi.getInfo())
 
         os.makedirs(output_dir, exist_ok=True)
 
+        # Get all available dates
         date_collection = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED') \
             .filterBounds(aoi) \
-            .filterDate(start_date, end_date) \
-            .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20))
-
+            .filterDate(start_date, end_date)
+        
         dates = date_collection.aggregate_array('system:time_start').getInfo()
         dates = [datetime.fromtimestamp(d/1000).strftime('%Y-%m-%d') for d in dates]
 
         results = []
         for date in dates:
             try:
-                output_tiff, stats_path = self._process_single_date(reservoir_name, aoi, date, parameter_name, output_dir)
+                output_tiff, stats_path = self._process_single_date(
+                    reservoir_name, aoi, date, parameter_name, output_dir)
                 results.append((date, output_tiff, stats_path))
             except Exception as e:
                 print(f"Error processing date {date}: {str(e)}")
@@ -185,11 +200,9 @@ class WaterQualityProcessor:
 
     def merge_tiff_files(self, directory, pattern, output_file):
         """Merge multiple TIFF files into a single file"""
-        # Create a subdirectory for merged files if it doesn't exist
         merged_dir = os.path.join(directory, "merged")
         os.makedirs(merged_dir, exist_ok=True)
 
-        # Get a list of all .tif files in the directory that match the pattern
         tif_files = glob.glob(os.path.join(directory, f'{pattern}*.tif'))
 
         print("Merging tiff files:")
@@ -199,28 +212,22 @@ class WaterQualityProcessor:
         if not tif_files:
             raise ValueError("No TIFF files found to merge")
 
-        # Open all the tif files
         src_files_to_mosaic = []
         for tif in tif_files:
             src = rasterio.open(tif)
             src_files_to_mosaic.append(src)
 
         try:
-            # Merge the tif files
             mosaic, out_trans = merge(src_files_to_mosaic)
-
-            # Copy the metadata from the first file
+            
             out_meta = src_files_to_mosaic[0].meta.copy()
-
-            # Update the metadata
             out_meta.update({
-                "driver": "GTiff",
                 "height": mosaic.shape[1],
                 "width": mosaic.shape[2],
                 "transform": out_trans,
+                "nodata": -9999  # Explicitly set the no-data value
             })
 
-            # Write the merged file to the merged subdirectory
             merged_output_file = os.path.join(merged_dir, output_file)
             with rasterio.open(merged_output_file, "w", **out_meta) as dest:
                 dest.write(mosaic)
@@ -228,15 +235,14 @@ class WaterQualityProcessor:
             print(f"Merged TIFF file created: {merged_output_file}")
 
         finally:
-            # Close the input files
             for src in src_files_to_mosaic:
                 src.close()
 
-        # Delete the original tile TIFs
+        # Delete the original tile TIFs (commented out for safety)
         for tif in tif_files:
             try:
-                #os.remove(tif)
-                print(f"Deleted tile file: {tif}")
+                os.remove(tif)
+                print(f"Would delete tile file: {tif}")
             except Exception as e:
                 print(f"Error deleting {tif}: {str(e)}")
 
