@@ -1,5 +1,0 @@
-Reservoir: maria
-Parameter: clorofila
-Date: 2020-01-02
-Minimum value: -0.7405472245845569
-Maximum value: 14.907379661884075

@@ -41,6 +41,14 @@ class WaterQualityProcessor:
         
         # Usar median() mesmo com uma imagem para manter a lógica que funciona
         image = sentinel2.median().clip(tile_geometry)
+
+        qa60 = image.select('QA60').toInt()  # Converter para inteiro
+        # Bit 10 é nuvem densa e bit 11 é cirrus
+        cloudBitMask = ee.Number(1 << 10)
+        cirrusBitMask = ee.Number(1 << 11)
+        # Se algum dos bits for 1, é nuvem
+        cloud_mask = qa60.bitwiseAnd(cloudBitMask).eq(0) \
+            .And(qa60.bitwiseAnd(cirrusBitMask).eq(0))
         
         # Select bands of interest
         bands = ['B2', 'B3', 'B4', 'B5', 'B8', 'B11']
@@ -49,6 +57,8 @@ class WaterQualityProcessor:
         # Create water mask
         MNDWI = image.normalizedDifference(['B3', 'B11']).rename('MNDWI')
         water_mask = MNDWI.gt(0.3)
+
+        valid_mask = water_mask.And(cloud_mask)
         
         # Calculate indices
         NDCI = image.normalizedDifference(['B5', 'B4']).rename('NDCI')
@@ -100,7 +110,8 @@ class WaterQualityProcessor:
         predicted_image = ee.Image.cat(weighted_bands).reduce(ee.Reducer.sum()).rename('parameter_pred')
         
         # Usar where em vez de updateMask para manter a lógica que funciona
-        final_image = predicted_image.where(water_mask.Not(), ee.Image.constant(-9999))
+        final_image = predicted_image.where(valid_mask.Not(), ee.Image.constant(-9999))
+        #final_image = predicted_image.where(water_mask.Not(), ee.Image.constant(-9999))
         
         return final_image
 
