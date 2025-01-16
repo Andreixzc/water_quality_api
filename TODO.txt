@@ -1,0 +1,4 @@
+1 - Atualizar para não usar TXT pra salvar os dados min e max
+2 - Mudar a query de retorno dos mapas para usar os parametros vindos do body e não do query parametros (a url vai mudar tbm)
+3 - Remover campos de start e final date da model de water_quality_analysis
+4 - Consertar o apocalipse do bug do milenio do mapas

@@ -1,0 +1,5 @@
+Reservoir: 1
+Parameter: 1
+Date: 2020-01-07
+Minimum value: -1.5227578481412913
+Maximum value: 7.45535100423264
