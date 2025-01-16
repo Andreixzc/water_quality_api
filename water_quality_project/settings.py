@@ -88,12 +88,13 @@ WSGI_APPLICATION = "water_quality_project.wsgi.application"
 #         'NAME': BASE_DIR / 'db.sqlite3',
 #     }
 # }
+#pw 1234
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": "water-quality-db",
         "USER": "postgres",
-        "PASSWORD": "1234",
+        "PASSWORD": "admin",
         "HOST": "localhost",
         "PORT": "5432",
     }

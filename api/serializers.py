@@ -3,6 +3,7 @@ import os
 from django.core.validators import FileExtensionValidator
 from django.core.files.storage import default_storage
 from django.conf import settings
+from django.utils.safestring import mark_safe
 from .models import (
     ReservoirParameterModel,
     User,
@@ -59,6 +60,14 @@ class WaterQualityAnalysisParametersSerializer(serializers.ModelSerializer):
         source="parameter.name", read_only=True
     )
 
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        if representation.get('intensity_map'):
+            # Normalize line endings and mark as safe
+            normalized_html = representation['intensity_map'].replace('\r\n', '\n')
+            representation['intensity_map'] = mark_safe(normalized_html)
+        return representation
+
     class Meta:
         model = WaterQualityAnalysisParameters
         fields = [
@@ -68,7 +77,7 @@ class WaterQualityAnalysisParametersSerializer(serializers.ModelSerializer):
             "parameter_name",
             "min_value",
             "max_value",
-            "intensity_map",  # comentar pra testar o retorno sem flodar a tela
+            "intensity_map",
             "analysis_date",
             "raster_path",
             "created_at",
@@ -199,7 +208,7 @@ class ReservoirParameterModelSerializer(serializers.ModelSerializer):
 
         # Save scaler file
         scaler_ext = os.path.splitext(scaler_file.name)[1]
-        scaler_filename = f"scaler_{instance.reservoir.id}_{instance.parameter.id}{scaler_ext}"  # noqa
+        scaler_filename = f"scaler_{instance.reservoir.id}_{instance.parameter.id}{scaler_ext}"
         scaler_path = os.path.join(settings.SCALERS_DIR, scaler_filename)
         with default_storage.open(scaler_path, "wb+") as destination:
             for chunk in scaler_file.chunks():

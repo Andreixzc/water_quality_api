@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Water Quality Map</title>
+</head>
+<body>
+    <div id="content"></div>
+
+    <script>
+        fetch('http://localhost:8000/api/analysis-parameters/?parameter_id=1&reservoir_id=1&start_date=2020-01-02&end_date=2020-01-02', {
+            headers: {
+                'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM3MDE0NjE3LCJpYXQiOjE3MzcwMTEwMTcsImp0aSI6ImQyMTYwOWMyNjU1NDQ4Y2U4Nzg0M2ZmNzNiYTJiNDk1IiwidXNlcl9pZCI6MX0.z6el99cLbCzMkfnSX-Li0ve1b7Dbu_gsInqxnWphZrk'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('content').innerHTML = data[0].intensity_map;
+        })
+        .catch(error => console.error('Error:', error));
+    </script>
+</body>
+</html>

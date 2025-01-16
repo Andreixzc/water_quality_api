@@ -133,6 +133,7 @@ class WaterQualityAnalysisViewSet(viewsets.ModelViewSet):
                         parameter_name=parameter.name,
                         date=date,
                     )
+                    normalized_map_html = map_html.replace('\r\n', '\n')
 
                     water_quality_analysis, created = (
                         WaterQualityAnalysis.objects.update_or_create(
@@ -154,7 +155,7 @@ class WaterQualityAnalysisViewSet(viewsets.ModelViewSet):
                                 "min_value": min_value,
                                 "max_value": max_value,
                                 "raster_path": output_tiff,
-                                "intensity_map": map_html,
+                                "intensity_map": normalized_map_html,
                                 "analysis_date": date,
                             },
                         )
@@ -166,7 +167,7 @@ class WaterQualityAnalysisViewSet(viewsets.ModelViewSet):
                             "parameter": parameter.name,
                             "analysis_date": date,
                             "raster_path": output_tiff,
-                            "intensity_map": map_html,
+                            "intensity_map": normalized_map_html,
                             "min_value": min_value,
                             "max_value": max_value,
                         }
