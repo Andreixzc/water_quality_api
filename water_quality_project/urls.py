@@ -6,9 +6,9 @@ from api.views import (
     ReservoirViewSet,
     WaterQualityAnalysisViewSet,
     ParameterViewSet,
-    ReservoirUsersViewSet,
-    WaterQualityAnalysisParametersViewSet,
-    ReservoirParameterModelViewSet,
+    ReservoirUserViewSet,
+    WaterQualityAnalysisParameterViewSet,
+    ReservoirParameterModelScalerViewSet,
 )
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -21,24 +21,26 @@ router.register(r"users", UserViewSet)
 router.register(r"reservoirs", ReservoirViewSet)
 router.register(r"analyses", WaterQualityAnalysisViewSet)
 router.register(r"parameters", ParameterViewSet)
-router.register(r"reservoir-users", ReservoirUsersViewSet)
+router.register(r"reservoir-users", ReservoirUserViewSet)
 router.register(
     r"analysis-parameters",
-    WaterQualityAnalysisParametersViewSet,
+    WaterQualityAnalysisParameterViewSet,
     basename="analysis-parameters",
 )
-router.register(r"reservoir-parameter-models", ReservoirParameterModelViewSet)
+router.register(
+    r"reservoir-parameter-models-scalers", ReservoirParameterModelScalerViewSet
+)
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include(router.urls)),
     path(
-        "api/token/",
+        "api/login/",
         TokenObtainPairView.as_view(permission_classes=[AllowAny]),
         name="token_obtain_pair",
     ),
     path(
-        "api/token/refresh/",
+        "api/login/refresh/",
         TokenRefreshView.as_view(permission_classes=[AllowAny]),
         name="token_refresh",
     ),

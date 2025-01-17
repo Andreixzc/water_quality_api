@@ -14,6 +14,9 @@ class User(AbstractUser):
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["username", "cpf"]
 
+    class Meta:
+        db_table = "user"
+
     def __str__(self):
         return self.email
 
@@ -25,13 +28,18 @@ class Reservoir(models.Model):
     )  # This will store the array structure directly
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    created_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_by = models.ForeignKey(
+        User, on_delete=models.CASCADE, blank=True, null=True
+    )
+
+    class Meta:
+        db_table = "reservoir"
 
     def __str__(self):
         return self.name
 
 
-class ReservoirUsers(models.Model):
+class ReservoirUser(models.Model):
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="reservoir_accesses"
     )
@@ -43,6 +51,7 @@ class ReservoirUsers(models.Model):
 
     class Meta:
         unique_together = ["user", "reservoir"]
+        db_table = "reservoir_user"
 
     def __str__(self):
         return f"{self.user.email} - {self.reservoir.name}"
@@ -52,13 +61,18 @@ class Parameter(models.Model):
     name = models.CharField(max_length=255, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    created_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_by = models.ForeignKey(
+        User, on_delete=models.CASCADE, blank=True, null=True
+    )
+
+    class Meta:
+        db_table = "parameter"
 
     def __str__(self):
         return self.name
 
 
-class ReservoirParameterModel(models.Model):
+class ReservoirParameterModelScaler(models.Model):
     reservoir = models.ForeignKey(
         "Reservoir", on_delete=models.CASCADE, related_name="parameter_models"
     )
@@ -74,6 +88,7 @@ class ReservoirParameterModel(models.Model):
 
     class Meta:
         unique_together = ["reservoir", "parameter"]
+        db_table = "reservoir_parameter_model_scaler"
 
     def __str__(self):
         return f"{self.reservoir.name} - {self.parameter.name} Model"
@@ -84,22 +99,18 @@ class WaterQualityAnalysis(models.Model):
         Reservoir, on_delete=models.CASCADE, related_name="analyses"
     )
     identifier_code = models.UUIDField(unique=True)
-    # remover esses campos e refatorar o codigo
-    # remover esses campos e refatorar o codigo
-    # remover esses campos e refatorar o codigo
-    # remover esses campos e refatorar o codigo
-
-    analysis_start_date = models.DateField()
-    analysis_end_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    created_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    analysis_date = models.DateField(null=True, blank=True)
+
+    class Meta:
+        db_table = "water_quality_analysis"
 
     def __str__(self):
-        return f"{self.reservoir.name} - {self.analysis_start_date}"
+        return f"{self.identifier_code} - {self.reservoir.name}"
 
 
-class WaterQualityAnalysisParameters(models.Model):
+class WaterQualityAnalysisParameter(models.Model):
     water_quality_analysis = models.ForeignKey(
         WaterQualityAnalysis,
         on_delete=models.CASCADE,
@@ -111,13 +122,13 @@ class WaterQualityAnalysisParameters(models.Model):
     min_value = models.FloatField()
     max_value = models.FloatField()
     raster_path = models.CharField(max_length=255)
-    analysis_date = models.DateField(null=True, blank=True)
     intensity_map = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         unique_together = ["water_quality_analysis", "parameter"]
+        db_table = "water_quality_analysis_parameter"
 
     def __str__(self):
         return (

@@ -4,8 +4,8 @@ from .models import (
     Reservoir,
     WaterQualityAnalysis,
     Parameter,
-    ReservoirUsers,
-    WaterQualityAnalysisParameters,
+    ReservoirUser,
+    WaterQualityAnalysisParameter,
 )
 
 
@@ -22,8 +22,8 @@ class ReservoirAdmin(admin.ModelAdmin):
     search_fields = ("name",)
 
 
-@admin.register(ReservoirUsers)
-class ReservoirUsersAdmin(admin.ModelAdmin):
+@admin.register(ReservoirUser)
+class ReservoirUserAdmin(admin.ModelAdmin):
     list_display = ("user", "reservoir", "created_at")
     search_fields = ("user__email", "reservoir__name")
     list_filter = ("created_at",)
@@ -40,16 +40,13 @@ class WaterQualityAnalysisAdmin(admin.ModelAdmin):
     list_display = (
         "reservoir",
         "identifier_code",
-        "analysis_start_date",
-        "analysis_end_date",
-        "created_by",
     )
     search_fields = ("reservoir__name", "identifier_code")
-    list_filter = ("analysis_start_date", "created_at")
+    list_filter = ("created_at",)
 
 
-@admin.register(WaterQualityAnalysisParameters)
-class WaterQualityAnalysisParametersAdmin(admin.ModelAdmin):
+@admin.register(WaterQualityAnalysisParameter)
+class WaterQualityAnalysisParameterAdmin(admin.ModelAdmin):
     list_display = (
         "water_quality_analysis",
         "parameter",

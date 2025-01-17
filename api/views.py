@@ -1,34 +1,33 @@
-from rest_framework import viewsets
-from .models import ReservoirParameterModel
-from .serializers import ReservoirParameterModelSerializer
-from rest_framework.decorators import action
+from .models import ReservoirParameterModelScaler
+from .serializers import ReservoirParameterModelScalerSerializer
 from django.conf import settings
 import os
+from datetime import datetime
+from .water_quality_processor import WaterQualityProcessor
+from .utils import generate_intensity_map
+from django.utils.dateparse import parse_date
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 from rest_framework import status
-from datetime import datetime
-from .water_quality_processor import WaterQualityProcessor
-import uuid
-from .utils import generate_intensity_map
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from django.utils.dateparse import parse_date
+from rest_framework.exceptions import PermissionDenied
+from rest_framework import viewsets
+from rest_framework.decorators import action
 
 from .models import (
     User,
     Reservoir,
     WaterQualityAnalysis,
     Parameter,
-    ReservoirUsers,
-    WaterQualityAnalysisParameters,
+    ReservoirUser,
+    WaterQualityAnalysisParameter,
 )
 from .serializers import (
     UserSerializer,
     ReservoirSerializer,
-    WaterQualityAnalysisSerializer,
     ParameterSerializer,
-    ReservoirUsersSerializer,
-    WaterQualityAnalysisParametersSerializer,
+    ReservoirUserSerializer,
+    WaterQualityAnalysisParameterSerializer,
 )
 
 
@@ -49,19 +48,16 @@ class ReservoirViewSet(viewsets.ModelViewSet):
     serializer_class = ReservoirSerializer
     permission_classes = [IsAuthenticated]
 
-    @action(detail=True, methods=["get"])
-    def parameter_models(self, request, pk=None):
-        reservoir = self.get_object()
-        parameter_models = reservoir.parameter_models.all()
-        serializer = ReservoirParameterModelSerializer(
-            parameter_models, many=True
-        )
-        return Response(serializer.data)
+    def perform_create(self, serializer):
+        if not self.request.user.is_authenticated:
+            raise PermissionDenied("User not authenticaded.")
+
+        serializer.save(created_by=self.request.user)
 
 
 class WaterQualityAnalysisViewSet(viewsets.ModelViewSet):
+
     queryset = WaterQualityAnalysis.objects.all()
-    serializer_class = WaterQualityAnalysisSerializer
     permission_classes = [IsAuthenticated]
 
     @action(detail=False, methods=["post"])
@@ -92,7 +88,7 @@ class WaterQualityAnalysisViewSet(viewsets.ModelViewSet):
         for parameter in parameters:
             try:
                 reservoir_parameter_model = (
-                    ReservoirParameterModel.objects.get(
+                    ReservoirParameterModelScaler.objects.get(
                         reservoir=reservoir, parameter=parameter
                     )
                 )
@@ -110,20 +106,24 @@ class WaterQualityAnalysisViewSet(viewsets.ModelViewSet):
                 )
                 os.makedirs(output_dir, exist_ok=True)
 
-                date_results = processor.process_reservoir(
+                _processor_results = processor.process_reservoir(
                     reservoir_id=str(reservoir.id),
                     parameter_id=str(parameter.id),
                     coordinates=reservoir.coordinates,
                     start_date=start_date.strftime("%Y-%m-%d"),
                     end_date=end_date.strftime("%Y-%m-%d"),
+                    request_user=request.user,
                     output_dir=output_dir,
                 )
 
-                for date, output_tiff, stats_path in date_results:
-                    with open(stats_path, "r") as f:
-                        stats = f.read().splitlines()
-                    min_value = float(stats[3].split(": ")[1])
-                    max_value = float(stats[4].split(": ")[1])
+                for (
+                    date,
+                    output_tiff,
+                    processing_statistics,
+                    water_quality_analysis,
+                ) in _processor_results:
+                    min_value = processing_statistics.get("min_value")
+                    max_value = processing_statistics.get("max_value")
 
                     map_html = generate_intensity_map(
                         coordinates_json=reservoir.coordinates,
@@ -133,59 +133,49 @@ class WaterQualityAnalysisViewSet(viewsets.ModelViewSet):
                         parameter_name=parameter.name,
                         date=date,
                     )
-                    normalized_map_html = map_html.replace('\r\n', '\n')
+                    normalized_map_html = map_html.replace("\r\n", "\n")
 
-                    water_quality_analysis, created = (
-                        WaterQualityAnalysis.objects.update_or_create(
-                            reservoir=reservoir,
-                            analysis_start_date=date,
-                            analysis_end_date=date,
-                            defaults={
-                                "identifier_code": uuid.uuid4(),
-                                "created_by": request.user,
-                            },
-                        )
-                    )
-
-                    analysis_param, created = (
-                        WaterQualityAnalysisParameters.objects.update_or_create(  # noqa
-                            water_quality_analysis=water_quality_analysis,
-                            parameter=parameter,
-                            defaults={
-                                "min_value": min_value,
-                                "max_value": max_value,
-                                "raster_path": output_tiff,
-                                "intensity_map": normalized_map_html,
-                                "analysis_date": date,
-                            },
-                        )
+                    WaterQualityAnalysisParameter.objects.update_or_create(
+                        water_quality_analysis=water_quality_analysis,
+                        parameter=parameter,
+                        defaults={
+                            "min_value": min_value,
+                            "max_value": max_value,
+                            "raster_path": output_tiff,
+                            "intensity_map": normalized_map_html,
+                        },
                     )
 
                     results.append(
                         {
-                            "reservoir": reservoir.name,
-                            "parameter": parameter.name,
-                            "analysis_date": date,
-                            "raster_path": output_tiff,
-                            "intensity_map": normalized_map_html,
-                            "min_value": min_value,
-                            "max_value": max_value,
+                            "identifier_code": water_quality_analysis.identifier_code,  # noqa
+                            "analysis_date": water_quality_analysis.analysis_date,  # noqa
+                            "reservoir_name": reservoir.name,
+                            "parameter_name": parameter.name,
+                            "success": True,
+                            "error": None,
                         }
                     )
 
-            except ReservoirParameterModel.DoesNotExist:
+            except ReservoirParameterModelScaler.DoesNotExist:
                 results.append(
                     {
-                        "reservoir": reservoir.name,
-                        "parameter": parameter.name,
+                        "identifier_code": water_quality_analysis.identifier_code,  # noqa
+                        "analysis_date": water_quality_analysis.analysis_date,
+                        "reservoir_name": reservoir.name,
+                        "parameter_name": parameter.name,
+                        "sucess": False,
                         "error": "No model found for this reservoir-parameter combination",  # noqa
                     }
                 )
             except Exception as e:
                 results.append(
                     {
-                        "reservoir": reservoir.name,
-                        "parameter": parameter.name,
+                        "identifier_code": water_quality_analysis.identifier_code,  # noqa
+                        "analysis_date": water_quality_analysis.analysis_date,
+                        "reservoir_name": reservoir.name,
+                        "parameter_name": parameter.name,
+                        "sucess": False,
                         "error": str(e),
                     }
                 )
@@ -193,21 +183,14 @@ class WaterQualityAnalysisViewSet(viewsets.ModelViewSet):
         return Response(results)
 
 
-@action(detail=False, methods=["get"])
-def get_parameters(self, request):
-    """Get list of available parameters for analysis."""
-    parameters = Parameter.objects.values("id", "name")
-    return Response(list(parameters))
-
-
-class WaterQualityAnalysisParametersViewSet(ViewSet):
+class WaterQualityAnalysisParameterViewSet(ViewSet):
     def list(self, request):
-        parameter_id = request.query_params.get("parameter_id")
+        parameters_id = request.query_params.getlist("parameters_id")
         reservoir_id = request.query_params.get("reservoir_id")
         start_date = request.query_params.get("start_date")
         end_date = request.query_params.get("end_date")
 
-        if not all([parameter_id, reservoir_id, start_date, end_date]):
+        if not all([parameters_id, reservoir_id, start_date, end_date]):
             return Response(
                 {"error": "Invalid parameters"},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -221,27 +204,22 @@ class WaterQualityAnalysisParametersViewSet(ViewSet):
                 raise ValueError("Invalid date format")
         except ValueError:
             return Response(
-                {"error": "Formato inválido. Use o formato AAAA-MM-DD."},
+                {"error": "Invalid format. Use 'AAAA-MM-DD'."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Consulta corrigida para acessar o campo correto na relação
-        wqap = WaterQualityAnalysisParameters.objects.filter(
-            parameter_id=parameter_id,
+        wqap = WaterQualityAnalysisParameter.objects.filter(
+            parameter_id__in=parameters_id,
             water_quality_analysis__reservoir_id=reservoir_id,
-            analysis_date__gte=start_date_obj,
-            analysis_date__lte=end_date_obj,
+            water_quality_analysis__analysis_date__gte=start_date_obj,
+            water_quality_analysis__analysis_date__lte=end_date_obj,
         )
 
         if not wqap.exists():
-            return Response(
-                {
-                    "error": "Nenhum dado encontrado para os parâmetros fornecidos."  # noqa
-                },
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            # in case if not exists, do something here
+            pass
 
-        serializer = WaterQualityAnalysisParametersSerializer(wqap, many=True)
+        serializer = WaterQualityAnalysisParameterSerializer(wqap, many=True)
         return Response(serializer.data)
 
 
@@ -250,14 +228,20 @@ class ParameterViewSet(viewsets.ModelViewSet):
     serializer_class = ParameterSerializer
     permission_classes = [IsAuthenticated]
 
+    def perform_create(self, serializer):
+        if not self.request.user.is_authenticated:
+            raise PermissionDenied("User not authenticaded.")
 
-class ReservoirUsersViewSet(viewsets.ModelViewSet):
-    queryset = ReservoirUsers.objects.all()
-    serializer_class = ReservoirUsersSerializer
+        serializer.save(created_by=self.request.user)
+
+
+class ReservoirUserViewSet(viewsets.ModelViewSet):
+    queryset = ReservoirUser.objects.all()
+    serializer_class = ReservoirUserSerializer
     permission_classes = [IsAuthenticated]
 
 
-class ReservoirParameterModelViewSet(viewsets.ModelViewSet):
-    queryset = ReservoirParameterModel.objects.all()
-    serializer_class = ReservoirParameterModelSerializer
+class ReservoirParameterModelScalerViewSet(viewsets.ModelViewSet):
+    queryset = ReservoirParameterModelScaler.objects.all()
+    serializer_class = ReservoirParameterModelScalerSerializer
     permission_classes = [IsAuthenticated]

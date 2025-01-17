@@ -1,3 +1,4 @@
+import uuid
 import ee
 import geemap
 import joblib
@@ -9,6 +10,8 @@ from threading import Lock
 import rasterio
 from rasterio.merge import merge
 import glob
+
+from api.models import WaterQualityAnalysis
 
 
 class WaterQualityProcessor:
@@ -173,6 +176,7 @@ class WaterQualityProcessor:
         coordinates,
         start_date,
         end_date,
+        request_user,
         output_dir="outputs",
     ):
         """Process a reservoir for all available dates in the given range"""
@@ -195,13 +199,32 @@ class WaterQualityProcessor:
             for d in dates
         ]
 
+        dates = list(set(dates))
+
         results = []
+
         for date in dates:
             try:
-                output_tiff, stats_path = self._process_single_date(
+                output_tiff, processing_statistics = self._process_single_date(
                     reservoir_id, aoi, date, parameter_id, output_dir
                 )
-                results.append((date, output_tiff, stats_path))
+                # analyse creation
+                water_quality_analysis, _ = (
+                    WaterQualityAnalysis.objects.get_or_create(
+                        reservoir_id=reservoir_id,
+                        analysis_date=date,
+                        defaults={"identifier_code": uuid.uuid4()},
+                    )
+                )
+                results.append(
+                    (
+                        date,
+                        output_tiff,
+                        processing_statistics,
+                        water_quality_analysis,
+                    )
+                )
+
             except Exception as e:
                 print(f"Error processing date {date}: {str(e)}")
 
@@ -265,23 +288,18 @@ class WaterQualityProcessor:
             output_dir, f"Tile_{date}", output_filename
         )
 
-        stats_filename = f"{reservoir_id}_{date}_{parameter_id}_stats.txt"
-        stats_path = os.path.join(output_dir, "merged", stats_filename)
-
         with rasterio.open(merged_output_path) as src:
             data = src.read(1)
             valid_data = data[data != -9999]
             min_value = np.min(valid_data)
             max_value = np.max(valid_data)
 
-        with open(stats_path, "w") as f:
-            f.write(f"Reservoir: {reservoir_id}\n")
-            f.write(f"Parameter: {parameter_id}\n")
-            f.write(f"Date: {date}\n")
-            f.write(f"Minimum value: {min_value}\n")
-            f.write(f"Maximum value: {max_value}\n")
+        processing_statistics = {
+            "min_value": min_value,
+            "max_value": max_value,
+        }
 
-        return merged_output_path, stats_path
+        return merged_output_path, processing_statistics
 
     def merge_tiff_files(self, directory, pattern, output_file):
         """Merge multiple TIFF files into a single file"""
