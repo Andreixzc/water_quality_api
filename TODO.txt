@@ -1,4 +1,22 @@
 8 - Consertar o apocalipse do bug do milenio do mapas
 9 - Quando a conexão cair, finalizar o processamento
 4 - Padronizar viewsets, serializers, postman
-5 - Verificar palavras em portugues, passar todo o sistema para inglês
+5 - verificar palavras em portugues, passar todo o sistema para inglês
+
+
+6 - validar antes no banco se não existe uma analise do mesmo parametro/data para econimizar requisição.
+7 - Logica de deletar análises antigas ao cadastrar novo modelo
+
+
+
+
+
+
+
+
+
+
+
+
+
+8: Futuramente, parametrizar entradas (bandas) na requisição para cada modelo.

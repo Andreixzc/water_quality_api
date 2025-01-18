@@ -95,7 +95,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": "water-quality-db",
         "USER": "postgres",
-        "PASSWORD": "1234",
+        "PASSWORD": "admin",
         "HOST": "localhost",
         "PORT": "5432",
     }

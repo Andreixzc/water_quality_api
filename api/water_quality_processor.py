@@ -42,9 +42,35 @@ class WaterQualityProcessor:
             "Month",
             "Season",
         ]
+    def create_daily_mosaic(self, aoi, date):
+        """Create a daily mosaic for the given area of interest and date"""
+        start_date = ee.Date(date)
+        end_date = start_date.advance(1, "day")
 
+        s2 = (ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
+              .filterBounds(aoi)
+              .filterDate(start_date, end_date)
+              .map(lambda image: image.set('date', image.date().format('yyyy-MM-dd'))))
+
+        daily_mosaic = ee.ImageCollection(
+            ee.Join.saveAll('images').apply(
+                primary=s2,
+                secondary=s2,
+                condition=ee.Filter.And(
+                    ee.Filter.equals(leftField='date', rightField='date'),
+                    ee.Filter.equals(leftField='SPACECRAFT_NAME', rightField='SPACECRAFT_NAME'),
+                    ee.Filter.equals(leftField='SENSING_ORBIT_NUMBER', rightField='SENSING_ORBIT_NUMBER')
+                )
+            )
+        ).map(lambda image: ee.ImageCollection(ee.List(image.get('images'))).mosaic()
+              .set('system:time_start', ee.Date(image.get('date')).millis()))
+
+        return daily_mosaic.first()
     def process_tile(self, tile_geometry, date):
         """Process a single tile of the area of interest"""
+        daily_mosaic = self.create_daily_mosaic(tile_geometry, date)
+        if daily_mosaic is None:
+            return None
         # Criar uma collection de 1 dia
         start_date = ee.Date(date)
         end_date = start_date.advance(1, "day")
@@ -60,7 +86,7 @@ class WaterQualityProcessor:
             return None
 
         # Usar median() mesmo com uma imagem para manter a lógica que funciona
-        image = sentinel2.median().clip(tile_geometry)
+        image = daily_mosaic.clip(tile_geometry)
 
         qa60 = image.select("QA60").toInt()
 
@@ -169,18 +195,8 @@ class WaterQualityProcessor:
 
         return final_image
 
-    def process_reservoir(
-        self,
-        reservoir_id,
-        parameter_id,
-        coordinates,
-        start_date,
-        end_date,
-        request_user,
-        output_dir="outputs",
-    ):
+    def process_reservoir(self, reservoir_id, parameter_id, coordinates, start_date, end_date, request_user, output_dir="outputs"):
         """Process a reservoir for all available dates in the given range"""
-        # Convert the coordinates to an Earth Engine Geometry
         aoi = ee.Geometry.Polygon([coordinates])
         print("Converted AOI:", aoi.getInfo())
 
