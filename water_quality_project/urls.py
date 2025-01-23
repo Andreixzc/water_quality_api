@@ -8,7 +8,7 @@ from api.views import (
     ParameterViewSet,
     ReservoirUserViewSet,
     WaterQualityAnalysisParameterViewSet,
-    ReservoirParameterModelScalerViewSet,
+    MachineLearningModelViewSet,
 )
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -27,9 +27,7 @@ router.register(
     WaterQualityAnalysisParameterViewSet,
     basename="analysis-parameters",
 )
-router.register(
-    r"reservoir-parameter-models-scalers", ReservoirParameterModelScalerViewSet
-)
+router.register(r"ml-models", MachineLearningModelViewSet)
 
 urlpatterns = [
     path("admin/", admin.site.urls),

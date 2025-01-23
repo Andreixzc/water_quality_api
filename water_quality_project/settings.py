@@ -169,10 +169,10 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODELS_DIR = os.path.join(BASE_DIR, "ml_models")
-SCALERS_DIR = os.path.join(BASE_DIR, "ml_scalers")
+# BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# MODELS_DIR = os.path.join(BASE_DIR, "ml_models")
+# SCALERS_DIR = os.path.join(BASE_DIR, "ml_scalers")
 
-# Ensure these directories exist
-os.makedirs(MODELS_DIR, exist_ok=True)
-os.makedirs(SCALERS_DIR, exist_ok=True)
+# # Ensure these directories exist
+# os.makedirs(MODELS_DIR, exist_ok=True)
+# os.makedirs(SCALERS_DIR, exist_ok=True)

@@ -50,8 +50,6 @@ class WaterQualityAnalysisParameterAdmin(admin.ModelAdmin):
     list_display = (
         "water_quality_analysis",
         "parameter",
-        "min_value",
-        "max_value",
     )
     search_fields = (
         "water_quality_analysis__reservoir__name",
