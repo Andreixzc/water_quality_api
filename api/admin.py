@@ -5,7 +5,6 @@ from .models import (
     WaterQualityAnalysis,
     Parameter,
     ReservoirUser,
-    WaterQualityAnalysisParameter,
 )
 
 
@@ -37,22 +36,6 @@ class ParameterAdmin(admin.ModelAdmin):
 
 @admin.register(WaterQualityAnalysis)
 class WaterQualityAnalysisAdmin(admin.ModelAdmin):
-    list_display = (
-        "reservoir",
-        "identifier_code",
-    )
-    search_fields = ("reservoir__name", "identifier_code")
+    list_display = ("identifier_code",)
+    search_fields = ("identifier_code",)
     list_filter = ("created_at",)
-
-
-@admin.register(WaterQualityAnalysisParameter)
-class WaterQualityAnalysisParameterAdmin(admin.ModelAdmin):
-    list_display = (
-        "water_quality_analysis",
-        "parameter",
-    )
-    search_fields = (
-        "water_quality_analysis__reservoir__name",
-        "parameter__name",
-    )
-    list_filter = ("parameter", "created_at")

@@ -4,11 +4,11 @@ from rest_framework.routers import DefaultRouter
 from api.views import (
     UserViewSet,
     ReservoirViewSet,
-    WaterQualityAnalysisViewSet,
+    WaterQualityAnalysisRequestViewSet,
     ParameterViewSet,
     ReservoirUserViewSet,
-    WaterQualityAnalysisParameterViewSet,
-    MachineLearningModelViewSet,
+    WaterQualityAnalysisMLModelViewSet,
+    MLModelViewSet,
 )
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -19,15 +19,15 @@ from rest_framework.permissions import AllowAny
 router = DefaultRouter()
 router.register(r"users", UserViewSet)
 router.register(r"reservoirs", ReservoirViewSet)
-router.register(r"analyses", WaterQualityAnalysisViewSet)
-router.register(r"parameters", ParameterViewSet)
 router.register(r"reservoir-users", ReservoirUserViewSet)
+router.register(r"parameters", ParameterViewSet)
 router.register(
     r"analysis-parameters",
-    WaterQualityAnalysisParameterViewSet,
+    WaterQualityAnalysisMLModelViewSet,
     basename="analysis-parameters",
 )
-router.register(r"ml-models", MachineLearningModelViewSet)
+router.register(r"ml-models", MLModelViewSet)
+router.register(r"analyses-request", WaterQualityAnalysisRequestViewSet)
 
 urlpatterns = [
     path("admin/", admin.site.urls),

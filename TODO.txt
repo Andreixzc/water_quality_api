@@ -1,22 +1,4 @@
-8 - Consertar o apocalipse do bug do milenio do mapas
-9 - Quando a conexão cair, finalizar o processamento
-4 - Padronizar viewsets, serializers, postman
-5 - verificar palavras em portugues, passar todo o sistema para inglês
-
-
-6 - validar antes no banco se não existe uma analise do mesmo parametro/data para econimizar requisição.
-7 - Logica de deletar análises antigas ao cadastrar novo modelo
-
-
-
-
-
-
-
-
-
-
-
-
-
-8: Futuramente, parametrizar entradas (bandas) na requisição para cada modelo.
+ 1 - Entender e implementar scheduler padrão (testar com coisa simples como fazer um get em um site e guardar no banco) (API_2) 
+ 2 - Pegar o request do banco e ir trabalhando no processamento (API_2) 
+ 3 - Salvar os dados no banco apos der tudo certo, a cada etapa alterar o status do request (API_2) 
+ 4 - Rota para cancelar analise (API_1) 

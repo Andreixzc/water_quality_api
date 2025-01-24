@@ -6,10 +6,12 @@ from .models import (
     Reservoir,
     Parameter,
     ReservoirUser,
-    WaterQualityAnalysisParameter,
-    MachineLearningModel,
+    WaterQualityAnalysisMLModel,
+    MLModel,
+    WaterQualityAnalysisRequest,
 )
-from .utils import serialize_model, compute_file_hash
+from .utils import compute_file_hash
+
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
@@ -43,12 +45,14 @@ class UserSerializer(serializers.ModelSerializer):
             instance.set_password(password)
         return super().update(instance, validated_data)
 
+
 class ParameterSerializer(serializers.ModelSerializer):
     class Meta:
         model = Parameter
         fields = ["id", "name", "created_at", "created_by"]
 
-class WaterQualityAnalysisParameterSerializer(serializers.ModelSerializer):
+
+class WaterQualityAnalysisMLModelSerializer(serializers.ModelSerializer):
     parameter_name = serializers.CharField(
         source="parameter.name", read_only=True
     )
@@ -56,12 +60,14 @@ class WaterQualityAnalysisParameterSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         if representation.get("intensity_map"):
-            normalized_html = representation["intensity_map"].replace("\r\n", "\n")
+            normalized_html = representation["intensity_map"].replace(
+                "\r\n", "\n"
+            )
             representation["intensity_map"] = mark_safe(normalized_html)
         return representation
 
     class Meta:
-        model = WaterQualityAnalysisParameter
+        model = WaterQualityAnalysisMLModel
         fields = [
             "id",
             "water_quality_analysis",
@@ -72,9 +78,12 @@ class WaterQualityAnalysisParameterSerializer(serializers.ModelSerializer):
             "created_at",
         ]
 
+
 class ReservoirUserSerializer(serializers.ModelSerializer):
     user_email = serializers.CharField(source="user.email", read_only=True)
-    reservoir_name = serializers.CharField(source="reservoir.name", read_only=True)
+    reservoir_name = serializers.CharField(
+        source="reservoir.name", read_only=True
+    )
 
     class Meta:
         model = ReservoirUser
@@ -87,6 +96,7 @@ class ReservoirUserSerializer(serializers.ModelSerializer):
             "created_at",
         ]
 
+
 class ReservoirSerializer(serializers.ModelSerializer):
     class Meta:
         model = Reservoir
@@ -98,34 +108,65 @@ class ReservoirSerializer(serializers.ModelSerializer):
             "created_by",
         ]
 
-class MachineLearningModelSerializer(serializers.ModelSerializer):
+
+class WaterQualityAnalysisRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WaterQualityAnalysisRequest
+        fields = [
+            "id",
+            "water_quality_analysis",
+            "water_quality_analysis_request_status",
+            "start_date",
+            "end_date",
+            "properties",
+            "created_by",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class MLModelSerializer(serializers.ModelSerializer):
     model_file = serializers.FileField()
     scaler_file = serializers.FileField()
 
     class Meta:
-        model = MachineLearningModel
+        model = MLModel
         fields = [
-            "id", "reservoir", "parameter", "model_file", "scaler_file",
-            "model_file_hash", "scaler_file_hash", "created_at", "is_active",
+            "id",
+            "reservoir",
+            "parameter",
+            "model_file",
+            "scaler_file",
+            "model_file_hash",
+            "scaler_file_hash",
+            "created_at",
         ]
         read_only_fields = ["model_file_hash", "scaler_file_hash"]
 
     def validate(self, data):
-        model_file = data.get('model_file')
-        scaler_file = data.get('scaler_file')
+        model_file = data.get("model_file")
+        scaler_file = data.get("scaler_file")
 
         if model_file:
             model_file_hash = compute_file_hash(model_file)
-            if MachineLearningModel.objects.filter(model_file_hash=model_file_hash).exists():
-                raise serializers.ValidationError("This model file has already been uploaded.")
-            data['model_file_hash'] = model_file_hash
-            data['model_file'] = model_file.read()
-        
+            if MLModel.objects.filter(
+                model_file_hash=model_file_hash
+            ).exists():
+                raise serializers.ValidationError(
+                    "This model file has already been uploaded."
+                )
+            data["model_file_hash"] = model_file_hash
+            data["model_file"] = model_file.read()
+
         if scaler_file:
             scaler_file_hash = compute_file_hash(scaler_file)
-            if MachineLearningModel.objects.filter(scaler_file_hash=scaler_file_hash).exists():
-                raise serializers.ValidationError("This scaler file has already been uploaded.")
-            data['scaler_file_hash'] = scaler_file_hash
-            data['scaler_file'] = scaler_file.read()
+            if MLModel.objects.filter(
+                scaler_file_hash=scaler_file_hash
+            ).exists():
+                raise serializers.ValidationError(
+                    "This scaler file has already been uploaded."
+                )
+            data["scaler_file_hash"] = scaler_file_hash
+            data["scaler_file"] = scaler_file.read()
 
         return data
