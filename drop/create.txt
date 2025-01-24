@@ -1,0 +1,3 @@
+sudo -i -u postgres
+dropdb water-quality-db
+createdb water-quality-db

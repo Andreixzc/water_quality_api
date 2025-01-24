@@ -1,203 +1,180 @@
-from rest_framework import viewsets
-from rest_framework import viewsets
-from .models import ReservoirParameterModel
-from .serializers import ReservoirParameterModelSerializer
-from rest_framework.decorators import action
-from django.conf import settings
-import os
+from .utils import deserialize_model
+from django.utils.dateparse import parse_date
 from rest_framework.response import Response
-from rest_framework import status
-from datetime import datetime, timedelta
-from .water_quality_processor import WaterQualityProcessor
+from rest_framework.viewsets import ViewSet
+from rest_framework import status, viewsets
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework import status
-from datetime import datetime, timedelta
-import os
-from django.conf import settings
-import uuid
-from .utils import generate_intensity_map
-from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
-import ee
+
 from .models import (
-    User, 
-    Reservoir, 
-    WaterQualityAnalysis,
+    User,
+    Reservoir,
     Parameter,
-    ReservoirUsers,
-    WaterQualityAnalysisParameters
+    ReservoirUser,
+    WaterQualityAnalysisMLModel,
+    WaterQualityAnalysisRequest,
+    MLModel,
 )
 from .serializers import (
-    UserSerializer, 
-    ReservoirSerializer, 
-    WaterQualityAnalysisSerializer,
+    UserSerializer,
+    ReservoirSerializer,
     ParameterSerializer,
-    ReservoirUsersSerializer,
-    WaterQualityAnalysisParametersSerializer
+    ReservoirUserSerializer,
+    WaterQualityAnalysisMLModelSerializer,
+    MLModelSerializer,
+    WaterQualityAnalysisRequestSerializer,
 )
+
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
     def get_permissions(self):
-        if self.action == 'create':
+        if self.action == "create":
             permission_classes = [AllowAny]
         else:
             permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]
+
 
 class ReservoirViewSet(viewsets.ModelViewSet):
     queryset = Reservoir.objects.all()
     serializer_class = ReservoirSerializer
     permission_classes = [IsAuthenticated]
 
-    @action(detail=True, methods=['get'])
-    def parameter_models(self, request, pk=None):
-        reservoir = self.get_object()
-        parameter_models = reservoir.parameter_models.all()
-        serializer = ReservoirParameterModelSerializer(parameter_models, many=True)
-        return Response(serializer.data)
+    def perform_create(self, serializer):
+        if not self.request.user.is_authenticated:
+            raise PermissionDenied("User not authenticated.")
+        serializer.save(created_by=self.request.user)
 
-class WaterQualityAnalysisViewSet(viewsets.ModelViewSet):
-    queryset = WaterQualityAnalysis.objects.all()
-    serializer_class = WaterQualityAnalysisSerializer
+
+class WaterQualityAnalysisRequestViewSet(viewsets.ModelViewSet):
+    queryset = WaterQualityAnalysisRequest.objects.all()
+    serializer_class = WaterQualityAnalysisRequestSerializer
     permission_classes = [IsAuthenticated]
 
-    @action(detail=False, methods=['post'])
-    def generate_analysis(self, request):
-        reservoir_id = request.data.get('reservoir_id')
-        parameter_ids = request.data.get('parameter_ids', [])
-        start_date = request.data.get('start_date')
-        end_date = request.data.get('end_date')
+    def create(self, request):
+        properties = request.data.get("properties")
+        start_date = request.data.get("start_date")
+        end_date = request.data.get("end_date")
 
-        if not all([reservoir_id, parameter_ids, start_date, end_date]):
-            return Response({"error": "Missing required parameters"}, status=status.HTTP_400_BAD_REQUEST)
+        if not all([properties, start_date, end_date]):
+            return Response(
+                {"error": "Missing required parameters"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
+        wqa_request = WaterQualityAnalysisRequest.objects.create(
+            start_date=start_date,
+            end_date=end_date,
+            properties=properties,
+        )
+        serializer = WaterQualityAnalysisRequestSerializer(wqa_request)
+        return Response(
+            serializer.data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    def perform_create(self, serializer):
+        if not self.request.user.is_authenticated:
+            raise PermissionDenied("User not authenticated.")
+        serializer.save(created_by=self.request.user)
+
+
+class WaterQualityAnalysisMLModelViewSet(ViewSet):
+    def list(self, request):
+        parameters_id = request.query_params.getlist("parameters_id")
+        reservoir_id = request.query_params.get("reservoir_id")
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
+
+        if not all([parameters_id, reservoir_id, start_date, end_date]):
+            return Response(
+                {"error": "Invalid parameters"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         try:
-            reservoir = Reservoir.objects.get(id=reservoir_id)
-            parameters = Parameter.objects.filter(id__in=parameter_ids)
-            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
-            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
-        except (Reservoir.DoesNotExist, Parameter.DoesNotExist, ValueError):
-            return Response({"error": "Invalid reservoir, parameter, or date format"}, status=status.HTTP_400_BAD_REQUEST)
+            start_date_obj = parse_date(start_date)
+            end_date_obj = parse_date(end_date)
 
-        results = []
-        for parameter in parameters:
-            try:
-                reservoir_parameter_model = ReservoirParameterModel.objects.get(
-                    reservoir=reservoir,
-                    parameter=parameter
-                )
+            if not start_date_obj or not end_date_obj:
+                raise ValueError("Invalid date format")
+        except ValueError:
+            return Response(
+                {"error": "Invalid format. Use 'YYYY-MM-DD'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-                processor = WaterQualityProcessor(
-                    model_path=reservoir_parameter_model.model_path,
-                    scaler_path=reservoir_parameter_model.scaler_path
-                )
+        wqap = WaterQualityAnalysisMLModel.objects.filter(
+            parameter_id__in=parameters_id,
+            water_quality_analysis__reservoir_id=reservoir_id,
+            water_quality_analysis__analysis_date__gte=start_date_obj,
+            water_quality_analysis__analysis_date__lte=end_date_obj,
+        )
 
-                output_dir = os.path.join(settings.MEDIA_ROOT, 'reservoir_analyses', reservoir.name, parameter.name)
-                os.makedirs(output_dir, exist_ok=True)
+        if not wqap.exists():
+            return Response(
+                {"error": "No data found for the given parameters"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
-                date_results = processor.process_reservoir(
-                    reservoir_name=reservoir.name,
-                    coordinates=reservoir.coordinates,
-                    start_date=start_date.strftime('%Y-%m-%d'),
-                    end_date=end_date.strftime('%Y-%m-%d'),
-                    parameter_name=parameter.name,
-                    output_dir=output_dir
-                )
+        serializer = WaterQualityAnalysisMLModelSerializer(wqap, many=True)
+        return Response(serializer.data)
 
-                for date, output_tiff, stats_path in date_results:
-                    with open(stats_path, 'r') as f:
-                        stats = f.read().splitlines()
-                    min_value = float(stats[3].split(': ')[1])
-                    max_value = float(stats[4].split(': ')[1])
-
-                    map_html = generate_intensity_map(
-                        coordinates_json=reservoir.coordinates,
-                        raster_path=output_tiff,
-                        min_value=min_value,
-                        max_value=max_value,
-                        parameter_name=parameter.name,
-                        date = date
-                    )
-
-                    # Save the HTML content to a file
-                    map_filename = f"{os.path.splitext(os.path.basename(output_tiff))[0]}_map.html"
-                    map_path = os.path.join(output_dir, map_filename)
-                    with open(map_path, 'w', encoding='utf-8') as f:
-                        f.write(map_html)
-
-                    water_quality_analysis, created = WaterQualityAnalysis.objects.update_or_create(
-                        reservoir=reservoir,
-                        analysis_start_date=date,
-                        analysis_end_date=date,
-                        defaults={
-                            'identifier_code': uuid.uuid4(),
-                            'created_by': request.user
-                        }
-                    )
-
-                    analysis_param, created = WaterQualityAnalysisParameters.objects.update_or_create(
-                        water_quality_analysis=water_quality_analysis,
-                        parameter=parameter,
-                        defaults={
-                            'min_value': min_value,
-                            'max_value': max_value,
-                            'raster_path': output_tiff,
-                            'intensity_map_path': map_path
-                        }
-                    )
-
-                    results.append({
-                        "reservoir": reservoir.name,
-                        "parameter": parameter.name,
-                        "analysis_date": date,
-                        "raster_path": output_tiff,
-                        "intensity_map_path": map_path,
-                        "min_value": min_value,
-                        "max_value": max_value
-                    })
-
-            except ReservoirParameterModel.DoesNotExist:
-                results.append({
-                    "reservoir": reservoir.name,
-                    "parameter": parameter.name,
-                    "error": "No model found for this reservoir-parameter combination"
-                })
-            except Exception as e:
-                results.append({
-                    "reservoir": reservoir.name,
-                    "parameter": parameter.name,
-                    "error": str(e)
-                })
-
-        return Response(results)
-
-@action(detail=False, methods=['get'])
-def get_parameters(self, request):
-    """Get list of available parameters for analysis."""
-    parameters = Parameter.objects.values('id', 'name')
-    return Response(list(parameters))
 
 class ParameterViewSet(viewsets.ModelViewSet):
     queryset = Parameter.objects.all()
     serializer_class = ParameterSerializer
     permission_classes = [IsAuthenticated]
 
-class ReservoirUsersViewSet(viewsets.ModelViewSet):
-    queryset = ReservoirUsers.objects.all()
-    serializer_class = ReservoirUsersSerializer
+    def perform_create(self, serializer):
+        if not self.request.user.is_authenticated:
+            raise PermissionDenied("User not authenticated.")
+        serializer.save(created_by=self.request.user)
+
+
+class ReservoirUserViewSet(viewsets.ModelViewSet):
+    queryset = ReservoirUser.objects.all()
+    serializer_class = ReservoirUserSerializer
     permission_classes = [IsAuthenticated]
 
-class WaterQualityAnalysisParametersViewSet(viewsets.ModelViewSet):
-    queryset = WaterQualityAnalysisParameters.objects.all()
-    serializer_class = WaterQualityAnalysisParametersSerializer
+
+class MLModelViewSet(viewsets.ModelViewSet):
+    queryset = MLModel.objects.all()
+    serializer_class = MLModelSerializer
     permission_classes = [IsAuthenticated]
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(
+            serializer.data, status=status.HTTP_201_CREATED, headers=headers
+        )
 
+    @action(detail=True, methods=["get"])
+    def download_model(self, request, pk=None):
+        instance = self.get_object()
+        model = deserialize_model(instance.model_file)  # noqa
+        # Implement logic to serve the model file for download
+        # This is a placeholder and needs to be implemented based on your
+        #  specific requirements
+        return Response(
+            {"message": "Model download functionality to be implemented"},
+            status=status.HTTP_501_NOT_IMPLEMENTED,
+        )
 
-class ReservoirParameterModelViewSet(viewsets.ModelViewSet):
-    queryset = ReservoirParameterModel.objects.all()
-    serializer_class = ReservoirParameterModelSerializer
-    permission_classes = [IsAuthenticated]  # Adjust permissions as needed
+    @action(detail=True, methods=["get"])
+    def download_scaler(self, request, pk=None):
+        instance = self.get_object()
+        scaler = deserialize_model(instance.scaler_file)  # noqa
+        # Implement logic to serve the scaler file for download
+        # This is a placeholder and needs to be implemented based on your
+        #  specific requirements
+        return Response(
+            {"message": "Scaler download functionality to be implemented"},
+            status=status.HTTP_501_NOT_IMPLEMENTED,
+        )

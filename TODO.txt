@@ -1,0 +1,4 @@
+ 1 - Entender e implementar scheduler padrão (testar com coisa simples como fazer um get em um site e guardar no banco) (API_2) 
+ 2 - Pegar o request do banco e ir trabalhando no processamento (API_2) 
+ 3 - Salvar os dados no banco apos der tudo certo, a cada etapa alterar o status do request (API_2) 
+ 4 - Rota para cancelar analise (API_1) 
