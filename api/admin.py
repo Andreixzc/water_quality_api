@@ -1,11 +1,9 @@
 from django.contrib import admin
-from .models import (
-    User,
-    Reservoir,
-    WaterQualityAnalysis,
-    Parameter,
-    ReservoirUser,
-)
+from api.models.user import User
+from api.models.reservoir import Reservoir
+from api.models.reservoir_user import ReservoirUser
+from api.models.parameter import Parameter
+from api.models.analysis import Analysis
 
 
 @admin.register(User)
@@ -34,8 +32,8 @@ class ParameterAdmin(admin.ModelAdmin):
     search_fields = ("name",)
 
 
-@admin.register(WaterQualityAnalysis)
-class WaterQualityAnalysisAdmin(admin.ModelAdmin):
+@admin.register(Analysis)
+class AnalysisAdmin(admin.ModelAdmin):
     list_display = ("identifier_code",)
     search_fields = ("identifier_code",)
     list_filter = ("created_at",)
