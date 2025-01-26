@@ -1,4 +1,0 @@
-sudo apt update
-sudo apt install gdal-bin libgdal-dev
-gdal-config --version
-pip install GDAL==3.8.4
