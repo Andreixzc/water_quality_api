@@ -9,6 +9,6 @@ def start():
     scheduler.add_jobstore(DjangoJobStore(), "default")
     
     # Executa a tarefa a cada 5 minutos
-    scheduler.add_job(check_for_new_requests, 'interval', minutes=5, jobstore='default')
+    scheduler.add_job(check_for_new_requests, 'interval', minutes=1, jobstore='default')
     
     scheduler.start()
