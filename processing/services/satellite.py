@@ -60,16 +60,72 @@ class SatelliteImageExtractor:
         return tasks_info
 
     def _prepare_for_export(self, image):
-        """Your existing prepare_for_export function"""
-        # ... (same as your current code)
+        """Prepare image for export with water and cloud masking"""
+        # Convert all bands to float32 first
+        bands = ["B2", "B3", "B4", "B5", "B8", "B11"]
+        base_image = image.select(bands).toFloat()
+        
+        # Create cloud mask from QA60 band
+        qa60 = image.select("QA60").toInt()
+        cloudBitMask = ee.Number(1 << 10)  # Dense cloud
+        cirrusBitMask = ee.Number(1 << 11)  # Cirrus
+        cloud_mask = (qa60.bitwiseAnd(cloudBitMask).eq(0)
+                     .And(qa60.bitwiseAnd(cirrusBitMask).eq(0)))
+        
+        # Create water mask using MNDWI
+        mndwi = base_image.normalizedDifference(["B3", "B11"])
+        water_mask = mndwi.gt(0.3)
+        
+        # Combine masks
+        valid_mask = water_mask.And(cloud_mask)
+        
+        # Scale the base bands to 0-1 range
+        base_image = base_image.divide(10000)
+        
+        # Calculate indices
+        ndci = base_image.normalizedDifference(["B5", "B4"]).rename("NDCI")
+        ndvi = base_image.normalizedDifference(["B8", "B4"]).rename("NDVI")
+        
+        # Calculate FAI
+        fai = base_image.expression(
+            "NIR - (RED + (SWIR - RED) * (NIR_wl - RED_wl) / (SWIR_wl - RED_wl))",
+            {
+                "NIR": base_image.select("B8"),
+                "RED": base_image.select("B4"),
+                "SWIR": base_image.select("B11"),
+                "NIR_wl": 842,
+                "RED_wl": 665,
+                "SWIR_wl": 1610,
+            }
+        ).rename("FAI")
+        
+        # Calculate band ratios
+        b3_b2_ratio = base_image.select("B3").divide(base_image.select("B2")).rename("B3_B2_ratio")
+        b4_b3_ratio = base_image.select("B4").divide(base_image.select("B3")).rename("B4_B3_ratio")
+        b5_b4_ratio = base_image.select("B5").divide(base_image.select("B4")).rename("B5_B4_ratio")
+        
+        # Combine all bands
+        final_image = base_image.addBands([ndci, ndvi, fai, mndwi.rename("MNDWI"),
+                                         b3_b2_ratio, b4_b3_ratio, b5_b4_ratio])
+        
+        # Apply mask to all bands
+        final_image = final_image.updateMask(valid_mask)
+        
+        return final_image.set("system:time_start", image.get("system:time_start"))
         
     def _create_export_task(self, image, aoi, folder_name):
         """Creates a single export task and returns task information"""
         image = ee.Image(image)
         date = ee.Date(image.get("system:time_start")).format("yyyy-MM-dd").getInfo()
         
+        # Create filename with date
+        filename = f"{folder_name}_{date}"
+        print("-----------------------------------------------------------------")
+        print(filename)
+        
         export_params = {
             "image": image, 
+            "description": filename,  # This will be the filename
             "scale": 10,
             "region": aoi,
             "fileFormat": "GeoTIFF",
@@ -84,5 +140,6 @@ class SatelliteImageExtractor:
             "task_id": task.id,
             "date": date,
             "folder": folder_name,
+            "filename": filename,
             "status": "STARTED"
         }

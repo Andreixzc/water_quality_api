@@ -6,6 +6,20 @@ from .services.satellite import SatelliteImageExtractor
 from api.models.analysis import Analysis
 from django.db.models import Count
 
+
+
+
+
+def check_for_new_requests():
+    """
+    Check for new analysis requests in QUEUED status and process them
+    """
+    new_requests = AnalysisRequest.objects.filter(
+        analysis_request_status_id=AnalysisRequestStatusEnum.QUEUED.value
+    )
+    for request in new_requests:
+        process_request(request.id)
+
 # Acho que eu estou validando se todos os modelos são do mesmo reservatório, e se eu não tenho parametro repetido, checar isso depois.
 def process_request(request_id):
     request = AnalysisRequest.objects.get(id=request_id)
@@ -32,7 +46,6 @@ def process_request(request_id):
         # Update status to DOWNLOADING_IMAGES
         request.analysis_request_status_id = AnalysisRequestStatusEnum.DOWNLOADING_IMAGES.value
         request.save()
-
         # Create Analysis record
         analysis = Analysis.objects.create(
             reservoir=reservoir,
