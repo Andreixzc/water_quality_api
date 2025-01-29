@@ -29,7 +29,7 @@ class WaterQualityPredictor:
         # Match the exact feature groups from training
         self.band_columns = ['B2', 'B3', 'B4', 'B5', 'B8', 'B11']
         self.index_columns = ['NDCI', 'NDVI', 'FAI', 'MNDWI', 
-                            'B3_B2_ratio', 'B4_B3_ratio', 'B5_B4_ratio']
+                              'B3_B2_ratio', 'B4_B3_ratio', 'B5_B4_ratio']
         self.temporal_columns = ['Month', 'Season']
         self.feature_columns = self.band_columns + self.index_columns + self.temporal_columns
 
@@ -39,10 +39,7 @@ class WaterQualityPredictor:
         b2, b3, b4, b5, b8, b11 = bands_chunk[0:6]
         
         # Calculate indices
-        # MNDWI (included in training)
         mndwi = np.where((b3 + b11) != 0, (b3 - b11) / (b3 + b11), 0)
-        
-        # Other indices
         ndci = np.where((b5 + b4) != 0, (b5 - b4) / (b5 + b4), 0)
         ndvi = np.where((b8 + b4) != 0, (b8 - b4) / (b8 + b4), 0)
         
@@ -111,18 +108,21 @@ class WaterQualityPredictor:
             print(f"Image dimensions: {width}x{height}")
             
             # Get date information from the filename
-            date_parts = Path(image_path).stem.split('_')[1:]  # Assuming format like 'analysis_YYYY_MM_DD'
-            date_str = '_'.join(date_parts)
-            try:
-                image_date = datetime.strptime(date_str, '%Y_%m_%d')
+            import re
+
+            match = re.search(r'\d{4}[-_]\d{2}[-_]\d{2}', Path(image_path).stem)
+            if match:
+                date_str = match.group(0)
+                image_date = datetime.strptime(date_str, '%Y-%m-%d' if '-' in date_str else '%Y_%m_%d')
                 month = image_date.month
                 season = ((month + 2) // 3) % 4 + 1
-            except ValueError as e:
-                print(f"Error parsing date from filename: {e}")
-                # Use current date as fallback
+            else:
+                print(f"Error: No valid date found in filename {image_path}, using current date as fallback.")
                 now = datetime.now()
                 month = now.month
                 season = ((month + 2) // 3) % 4 + 1
+                date_str = now.strftime('%Y_%m_%d')
+
             
             # Prepare output array
             output_data = np.full((height, width), -9999, dtype=np.float32)
