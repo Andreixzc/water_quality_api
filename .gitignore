@@ -138,3 +138,8 @@ GitHub.sublime-settings
 !.vscode/launch.json 
 !.vscode/extensions.json 
 .history
+
+
+
+# Google credencials #
+processing/credentials/

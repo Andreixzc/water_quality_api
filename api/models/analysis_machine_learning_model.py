@@ -8,7 +8,7 @@ class AnalysisMachineLearningModel(models.Model):
     machine_learning_model = models.ForeignKey(
         MachineLearningModel, on_delete=models.CASCADE, blank=False, null=False
     )
-    raster_path = models.CharField(max_length=255)
+    raster_path = models.TextField()  # Changed from CharField to TextField
     intensity_map = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

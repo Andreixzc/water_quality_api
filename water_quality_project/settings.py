@@ -177,3 +177,8 @@ CORS_ALLOWED_ORIGINS = [
 # # Ensure these directories exist
 # os.makedirs(MODELS_DIR, exist_ok=True)
 # os.makedirs(SCALERS_DIR, exist_ok=True)
+
+
+import os
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_URL = '/media/'
