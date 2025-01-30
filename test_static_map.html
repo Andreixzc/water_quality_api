@@ -6,27 +6,47 @@
     <title>Analysis Map Viewer</title>
     <style>
         .container {
-            max-width: 800px;
+            max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
         }
-        .map-container {
+        .controls {
+            margin-bottom: 20px;
+            display: grid;
+            gap: 10px;
+        }
+        .date-range {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .maps-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
             margin-top: 20px;
         }
+        .map-item {
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 4px;
+        }
         .map-image {
-            max-width: 100%;
+            width: 100%;
             height: auto;
         }
         .error {
             color: red;
             margin-top: 10px;
         }
-        .controls {
-            margin-bottom: 20px;
+        input, select, button {
+            padding: 8px;
+            margin: 5px 0;
         }
-        input, button {
-            margin: 5px;
-            padding: 5px;
+        .info {
+            margin-top: 5px;
+            font-size: 0.9em;
+            color: #666;
         }
     </style>
 </head>
@@ -34,54 +54,207 @@
     <div class="container">
         <h1>Analysis Map Viewer</h1>
         <div class="controls">
-            <input type="text" id="analysisId" placeholder="Enter Analysis ID">
             <input type="text" id="token" placeholder="Enter Bearer Token">
-            <button onclick="fetchMap()">View Map</button>
+    <button onclick="loadReservoirs()">Load Reservoirs</button>
+    <select id="reservoirSelect">
+        <option value="">Select Reservoir</option>
+    </select>
+            <input type="text" id="token" placeholder="Enter Bearer Token">
+            <select id="reservoirSelect">
+                <option value="">Select Reservoir</option>
+            </select>
+            <select id="groupSelect">
+                <option value="">Select Analysis Group</option>
+            </select>
+            <select id="parameterSelect">
+                <option value="">Select Parameter</option>
+            </select>
+            <div class="date-range">
+                <label>Date Range:</label>
+                <input type="date" id="startDate">
+                <span>to</span>
+                <input type="date" id="endDate">
+            </div>
+            <button onclick="fetchMaps()">View Maps</button>
         </div>
         
-        <div class="map-container">
-            <img id="mapImage" class="map-image" style="display: none;">
-        </div>
+        <div class="maps-container" id="mapsContainer"></div>
         <div id="error" class="error"></div>
     </div>
 
     <script>
-        const API_BASE_URL = 'http://localhost:8000';  // Adjust if your server runs on a different port
+        const API_BASE_URL = 'http://localhost:8000';
 
-        async function fetchMap() {
-            const analysisId = document.getElementById('analysisId').value;
+        // Load initial data when page loads
+        window.onload = async () => {
+            const token = localStorage.getItem('token');
+            if (token) {
+                document.getElementById('token').value = token;
+                await loadReservoirs();
+            }
+        };
+
+        async function loadReservoirs() {
+    const token = document.getElementById('token').value;
+    console.log('Loading reservoirs with token:', token);
+    localStorage.setItem('token', token);
+    
+    try {
+        console.log('Making request to:', `${API_BASE_URL}/api/reservoirs/`);
+        const response = await fetch(`${API_BASE_URL}/api/reservoirs/`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/json'
+            }
+        });
+
+        console.log('Response status:', response.status);
+        if (!response.ok) {
+            const error = await response.text();
+            console.error('Response error:', error);
+            throw new Error(`Failed to fetch reservoirs: ${response.status}`);
+        }
+        
+        const reservoirs = await response.json();
+        console.log('Received reservoirs:', reservoirs);
+        
+        const select = document.getElementById('reservoirSelect');
+        select.innerHTML = '<option value="">Select Reservoir</option>';
+        reservoirs.forEach(reservoir => {
+            const option = document.createElement('option');
+            option.value = reservoir.id;
+            option.textContent = reservoir.name;
+            select.appendChild(option);
+        });
+
+        select.onchange = () => loadGroups(select.value);
+    } catch (error) {
+        console.error('Error in loadReservoirs:', error);
+        showError(error);
+    }
+}
+
+        async function loadGroups(reservoirId) {
+            if (!reservoirId) return;
             const token = document.getElementById('token').value;
-            const mapImage = document.getElementById('mapImage');
-            const errorDiv = document.getElementById('error');
             
             try {
-                errorDiv.textContent = '';
-                mapImage.style.display = 'none';
-                
-                const response = await fetch(`${API_BASE_URL}/api/analysis-parameters/${analysisId}/`, {
-                    method: 'GET',
+                const response = await fetch(`${API_BASE_URL}/api/analysis-parameters/groups/?reservoir_id=${reservoirId}`, {
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Accept': 'application/json'
                     }
                 });
 
+                if (!response.ok) throw new Error('Failed to fetch groups');
+                
+                const groups = await response.json();
+                const select = document.getElementById('groupSelect');
+                select.innerHTML = '<option value="">Select Analysis Group</option>';
+                groups.forEach(group => {
+                    const option = document.createElement('option');
+                    option.value = group.id;
+                    option.textContent = `Analysis ${group.id} (${group.start_date} to ${group.end_date})`;
+                    select.appendChild(option);
+                });
+
+                select.onchange = () => loadParameters(select.value);
+            } catch (error) {
+                showError(error);
+            }
+        }
+
+        async function loadParameters(groupId) {
+            if (!groupId) return;
+            const token = document.getElementById('token').value;
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/parameters/`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (!response.ok) throw new Error('Failed to fetch parameters');
+                
+                const parameters = await response.json();
+                const select = document.getElementById('parameterSelect');
+                select.innerHTML = '<option value="">Select Parameter</option>';
+                parameters.forEach(param => {
+                    const option = document.createElement('option');
+                    option.value = param.id;
+                    option.textContent = param.name;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                showError(error);
+            }
+        }
+
+        async function fetchMaps() {
+            const token = document.getElementById('token').value;
+            const groupId = document.getElementById('groupSelect').value;
+            const parameterId = document.getElementById('parameterSelect').value;
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const mapsContainer = document.getElementById('mapsContainer');
+            const errorDiv = document.getElementById('error');
+            
+            try {
+                errorDiv.textContent = '';
+                mapsContainer.innerHTML = '';
+                
+                const response = await fetch(
+                    `${API_BASE_URL}/api/analysis-parameters/by_group/?` + 
+                    `group_id=${groupId}&parameter_id=${parameterId}` +
+                    (startDate ? `&start_date=${startDate}` : '') +
+                    (endDate ? `&end_date=${endDate}` : ''),
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Accept': 'application/json'
+                        }
+                    }
+                );
+
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
-                const data = await response.json();
+                const analyses = await response.json();
                 
-                if (data.static_map_base64) {
-                    mapImage.src = `data:image/png;base64,${data.static_map_base64}`;
-                    mapImage.style.display = 'block';
-                } else {
-                    throw new Error('No map data available');
+                analyses.forEach(analysis => {
+                    if (analysis.static_map_base64) {
+                        const mapItem = document.createElement('div');
+                        mapItem.className = 'map-item';
+                        
+                        const img = document.createElement('img');
+                        img.src = `data:image/png;base64,${analysis.static_map_base64}`;
+                        img.className = 'map-image';
+                        
+                        const info = document.createElement('div');
+                        info.className = 'info';
+                        info.textContent = `Date: ${analysis.analysis.analysis_date}`;
+                        
+                        mapItem.appendChild(img);
+                        mapItem.appendChild(info);
+                        mapsContainer.appendChild(mapItem);
+                    }
+                });
+
+                if (mapsContainer.children.length === 0) {
+                    throw new Error('No maps available for the selected criteria');
                 }
             } catch (error) {
-                errorDiv.textContent = `Error: ${error.message}`;
-                console.error('Error details:', error);
+                showError(error);
             }
+        }
+
+        function showError(error) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = `Error: ${error.message}`;
+            console.error('Error details:', error);
         }
     </script>
 </body>
