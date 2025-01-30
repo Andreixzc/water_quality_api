@@ -55,15 +55,11 @@
         <h1>Analysis Map Viewer</h1>
         <div class="controls">
             <input type="text" id="token" placeholder="Enter Bearer Token">
-    <button onclick="loadReservoirs()">Load Reservoirs</button>
-    <select id="reservoirSelect">
-        <option value="">Select Reservoir</option>
-    </select>
-            <input type="text" id="token" placeholder="Enter Bearer Token">
-            <select id="reservoirSelect">
+            <button onclick="loadReservoirs()">Load Reservoirs</button>
+            <select id="reservoirSelect" onchange="loadGroups(this.value)">
                 <option value="">Select Reservoir</option>
             </select>
-            <select id="groupSelect">
+            <select id="groupSelect" onchange="loadParameters(this.value)">
                 <option value="">Select Analysis Group</option>
             </select>
             <select id="parameterSelect">
@@ -77,7 +73,6 @@
             </div>
             <button onclick="fetchMaps()">View Maps</button>
         </div>
-        
         <div class="maps-container" id="mapsContainer"></div>
         <div id="error" class="error"></div>
     </div>
@@ -85,7 +80,6 @@
     <script>
         const API_BASE_URL = 'http://localhost:8000';
 
-        // Load initial data when page loads
         window.onload = async () => {
             const token = localStorage.getItem('token');
             if (token) {
@@ -94,71 +88,31 @@
             }
         };
 
-        async function loadReservoirs() {
-    const token = document.getElementById('token').value;
-    console.log('Loading reservoirs with token:', token);
-    localStorage.setItem('token', token);
-    
-    try {
-        console.log('Making request to:', `${API_BASE_URL}/api/reservoirs/`);
-        const response = await fetch(`${API_BASE_URL}/api/reservoirs/`, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Accept': 'application/json'
-            }
-        });
-
-        console.log('Response status:', response.status);
-        if (!response.ok) {
-            const error = await response.text();
-            console.error('Response error:', error);
-            throw new Error(`Failed to fetch reservoirs: ${response.status}`);
+        async function fetchAPI(endpoint, token) {
+            const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+                headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response.json();
         }
-        
-        const reservoirs = await response.json();
-        console.log('Received reservoirs:', reservoirs);
-        
-        const select = document.getElementById('reservoirSelect');
-        select.innerHTML = '<option value="">Select Reservoir</option>';
-        reservoirs.forEach(reservoir => {
-            const option = document.createElement('option');
-            option.value = reservoir.id;
-            option.textContent = reservoir.name;
-            select.appendChild(option);
-        });
 
-        select.onchange = () => loadGroups(select.value);
-    } catch (error) {
-        console.error('Error in loadReservoirs:', error);
-        showError(error);
-    }
-}
+        async function loadReservoirs() {
+            try {
+                const token = document.getElementById('token').value;
+                localStorage.setItem('token', token);
+                const reservoirs = await fetchAPI('/api/reservoirs/', token);
+                populateSelect('reservoirSelect', reservoirs, 'id', 'name', 'Select Reservoir');
+            } catch (error) {
+                showError(error);
+            }
+        }
 
         async function loadGroups(reservoirId) {
             if (!reservoirId) return;
-            const token = document.getElementById('token').value;
-            
             try {
-                const response = await fetch(`${API_BASE_URL}/api/analysis-parameters/groups/?reservoir_id=${reservoirId}`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/json'
-                    }
-                });
-
-                if (!response.ok) throw new Error('Failed to fetch groups');
-                
-                const groups = await response.json();
-                const select = document.getElementById('groupSelect');
-                select.innerHTML = '<option value="">Select Analysis Group</option>';
-                groups.forEach(group => {
-                    const option = document.createElement('option');
-                    option.value = group.id;
-                    option.textContent = `Analysis ${group.id} (${group.start_date} to ${group.end_date})`;
-                    select.appendChild(option);
-                });
-
-                select.onchange = () => loadParameters(select.value);
+                const token = document.getElementById('token').value;
+                const groups = await fetchAPI(`/api/analysis-parameters/groups/?reservoir_id=${reservoirId}`, token);
+                populateSelect('groupSelect', groups, 'id', g => `Analysis ${g.id} (${g.start_date} to ${g.end_date})`, 'Select Analysis Group');
             } catch (error) {
                 showError(error);
             }
@@ -166,95 +120,63 @@
 
         async function loadParameters(groupId) {
             if (!groupId) return;
-            const token = document.getElementById('token').value;
-            
             try {
-                const response = await fetch(`${API_BASE_URL}/api/parameters/`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/json'
-                    }
-                });
-
-                if (!response.ok) throw new Error('Failed to fetch parameters');
-                
-                const parameters = await response.json();
-                const select = document.getElementById('parameterSelect');
-                select.innerHTML = '<option value="">Select Parameter</option>';
-                parameters.forEach(param => {
-                    const option = document.createElement('option');
-                    option.value = param.id;
-                    option.textContent = param.name;
-                    select.appendChild(option);
-                });
+                const token = document.getElementById('token').value;
+                const parameters = await fetchAPI('/api/parameters/', token);
+                populateSelect('parameterSelect', parameters, 'id', 'name', 'Select Parameter');
             } catch (error) {
                 showError(error);
             }
         }
 
         async function fetchMaps() {
-            const token = document.getElementById('token').value;
-            const groupId = document.getElementById('groupSelect').value;
-            const parameterId = document.getElementById('parameterSelect').value;
-            const startDate = document.getElementById('startDate').value;
-            const endDate = document.getElementById('endDate').value;
-            const mapsContainer = document.getElementById('mapsContainer');
-            const errorDiv = document.getElementById('error');
-            
             try {
-                errorDiv.textContent = '';
-                mapsContainer.innerHTML = '';
-                
-                const response = await fetch(
-                    `${API_BASE_URL}/api/analysis-parameters/by_group/?` + 
-                    `group_id=${groupId}&parameter_id=${parameterId}` +
+                const token = document.getElementById('token').value;
+                const groupId = document.getElementById('groupSelect').value;
+                const parameterId = document.getElementById('parameterSelect').value;
+                const startDate = document.getElementById('startDate').value;
+                const endDate = document.getElementById('endDate').value;
+                const query = `group_id=${groupId}&parameter_id=${parameterId}` +
                     (startDate ? `&start_date=${startDate}` : '') +
-                    (endDate ? `&end_date=${endDate}` : ''),
-                    {
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Accept': 'application/json'
-                        }
-                    }
-                );
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const analyses = await response.json();
+                    (endDate ? `&end_date=${endDate}` : '');
                 
-                analyses.forEach(analysis => {
-                    if (analysis.static_map_base64) {
-                        const mapItem = document.createElement('div');
-                        mapItem.className = 'map-item';
-                        
-                        const img = document.createElement('img');
-                        img.src = `data:image/png;base64,${analysis.static_map_base64}`;
-                        img.className = 'map-image';
-                        
-                        const info = document.createElement('div');
-                        info.className = 'info';
-                        info.textContent = `Date: ${analysis.analysis.analysis_date}`;
-                        
-                        mapItem.appendChild(img);
-                        mapItem.appendChild(info);
-                        mapsContainer.appendChild(mapItem);
-                    }
-                });
-
-                if (mapsContainer.children.length === 0) {
-                    throw new Error('No maps available for the selected criteria');
-                }
+                const analyses = await fetchAPI(`/api/analysis-parameters/by_group/?${query}`, token);
+                displayMaps(analyses);
             } catch (error) {
                 showError(error);
             }
         }
 
+        function populateSelect(selectId, items, valueKey, textKey, defaultText) {
+            const select = document.getElementById(selectId);
+            select.innerHTML = `<option value="">${defaultText}</option>`;
+            items.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item[valueKey];
+                option.textContent = typeof textKey === 'function' ? textKey(item) : item[textKey];
+                select.appendChild(option);
+            });
+        }
+
+        function displayMaps(analyses) {
+            const mapsContainer = document.getElementById('mapsContainer');
+            mapsContainer.innerHTML = '';
+            analyses.forEach(analysis => {
+                if (analysis.static_map_base64) {
+                    const mapItem = document.createElement('div');
+                    mapItem.className = 'map-item';
+                    mapItem.innerHTML = `
+                        <img src="data:image/png;base64,${analysis.static_map_base64}" class="map-image">
+                        <div class="info">Date: ${analysis.analysis.analysis_date}</div>`;
+                    mapsContainer.appendChild(mapItem);
+                }
+            });
+            if (mapsContainer.children.length === 0) showError(new Error('No maps available for the selected criteria'));
+        }
+
         function showError(error) {
-            const errorDiv = document.getElementById('error');
-            errorDiv.textContent = `Error: ${error.message}`;
-            console.error('Error details:', error);
+            document.getElementById('error').textContent = `Error: ${error.message}`;
+            console.error(error);
         }
     </script>
 </body>
