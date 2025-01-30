@@ -10,6 +10,14 @@ from api.serializers.analysis_machine_learning_model_serializer import (
 
 
 class AnalysisMachineLearningModelViewSet(viewsets.ModelViewSet):
+    serializer_class = AnalysisMachineLearningModelSerializer
+
+    def get_queryset(self):
+        """
+        Default queryset for viewset methods that need it
+        """
+        return AnalysisMachineLearningModel.objects.all()
+
     def list(self, request):
         parameters_id = request.query_params.getlist("parameters_id")
         reservoir_id = request.query_params.get("reservoir_id")

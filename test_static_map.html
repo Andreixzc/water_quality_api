@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analysis Map Viewer</title>
+    <style>
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .map-container {
+            margin-top: 20px;
+        }
+        .map-image {
+            max-width: 100%;
+            height: auto;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+        .controls {
+            margin-bottom: 20px;
+        }
+        input, button {
+            margin: 5px;
+            padding: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Analysis Map Viewer</h1>
+        <div class="controls">
+            <input type="text" id="analysisId" placeholder="Enter Analysis ID">
+            <input type="text" id="token" placeholder="Enter Bearer Token">
+            <button onclick="fetchMap()">View Map</button>
+        </div>
+        
+        <div class="map-container">
+            <img id="mapImage" class="map-image" style="display: none;">
+        </div>
+        <div id="error" class="error"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000';  // Adjust if your server runs on a different port
+
+        async function fetchMap() {
+            const analysisId = document.getElementById('analysisId').value;
+            const token = document.getElementById('token').value;
+            const mapImage = document.getElementById('mapImage');
+            const errorDiv = document.getElementById('error');
+            
+            try {
+                errorDiv.textContent = '';
+                mapImage.style.display = 'none';
+                
+                const response = await fetch(`${API_BASE_URL}/api/analysis-parameters/${analysisId}/`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.static_map_base64) {
+                    mapImage.src = `data:image/png;base64,${data.static_map_base64}`;
+                    mapImage.style.display = 'block';
+                } else {
+                    throw new Error('No map data available');
+                }
+            } catch (error) {
+                errorDiv.textContent = `Error: ${error.message}`;
+                console.error('Error details:', error);
+            }
+        }
+    </script>
+</body>
+</html>
