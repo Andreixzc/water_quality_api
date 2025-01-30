@@ -28,6 +28,7 @@ class SatelliteImageExtractor:
             .filterDate(start_date, end_date)
             .map(lambda image: image.set("date", image.date().format("yyyy-MM-dd"))))
         
+        
         # Create daily mosaics
         daily = ee.ImageCollection(
             ee.Join.saveAll("images").apply(

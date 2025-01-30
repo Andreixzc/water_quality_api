@@ -10,6 +10,7 @@ class AnalysisMachineLearningModel(models.Model):
     )
     raster_path = models.TextField()  # Changed from CharField to TextField
     intensity_map = models.TextField(null=True, blank=True)
+    static_map = models.BinaryField(null=True, blank=True) 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
