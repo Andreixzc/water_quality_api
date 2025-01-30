@@ -16,6 +16,9 @@ class AnalysisMachineLearningModelViewSet(viewsets.ModelViewSet):
         start_date = request.query_params.get("start_date")
         end_date = request.query_params.get("end_date")
         group_id = request.query_params.get("group_id")  # New parameter
+        print("00000000000000000000000")
+        print(parameters_id, reservoir_id, start_date, end_date, group_id)
+
 
         if not all([parameters_id, reservoir_id, start_date, end_date]):
             return Response(
@@ -54,11 +57,19 @@ class AnalysisMachineLearningModelViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
+
+
+    
     @action(detail=False, methods=['GET'])
     def by_group(self, request):
         """Get all analyses for a specific group"""
         group_id = request.query_params.get('group_id')
         parameter_id = request.query_params.get('parameter_id')
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
+
+        print("00000000000000000000000")
+        print(group_id, parameter_id, start_date, end_date)
 
         if not group_id:
             return Response(
@@ -66,8 +77,29 @@ class AnalysisMachineLearningModelViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        if not start_date or not end_date:
+            return Response(
+                {"error": "start_date and end_date are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            start_date_obj = parse_date(start_date)
+            end_date_obj = parse_date(end_date)
+
+            if not start_date_obj or not end_date_obj:
+                raise ValueError("Invalid date format")
+
+        except ValueError:
+            return Response(
+                {"error": "Invalid format. Use 'YYYY-MM-DD'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         queryset = self.queryset.filter(
-            analysis__analysis_group_id=group_id
+            analysis__analysis_group_id=group_id,
+            analysis__analysis_date__gte=start_date_obj,
+            analysis__analysis_date__lte=end_date_obj
         )
 
         if parameter_id:
@@ -77,6 +109,7 @@ class AnalysisMachineLearningModelViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
 
     @action(detail=False, methods=['GET'])
     def groups(self, request):
