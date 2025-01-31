@@ -4,7 +4,7 @@ import time
 
 
 class Command(BaseCommand):
-    help = 'Start the scheduler for processing analysis requests'
+    help = "Start the scheduler for processing analysis requests"
 
     def handle(self, *args, **kwargs):
         self.stdout.write("Starting scheduler...")
@@ -13,6 +13,8 @@ class Command(BaseCommand):
         # Manter o processo vivo
         try:
             while True:
-                time.sleep(1)  # Aguarda 1 segundo para evitar sobrecarga de CPU
+                time.sleep(
+                    1
+                )  # Aguarda 1 segundo para evitar sobrecarga de CPU
         except KeyboardInterrupt:
             self.stdout.write("Scheduler stopped.")

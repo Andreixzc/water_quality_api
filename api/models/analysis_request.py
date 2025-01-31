@@ -1,13 +1,13 @@
 from django.db import models
-from api.models.analysis import Analysis
+from api.models.analysis import AnalysisGroup
 from api.models.analysis_request_status import AnalysisRequestStatus
 from api.models.user import User
 from api.enums.analysis_request_status_enum import AnalysisRequestStatusEnum
 
 
 class AnalysisRequest(models.Model):
-    analysis = models.ForeignKey(
-        Analysis, on_delete=models.CASCADE, null=True, blank=True
+    analysis_group = models.ForeignKey(
+        AnalysisGroup, on_delete=models.CASCADE, null=True, blank=True
     )
     analysis_request_status = models.ForeignKey(
         AnalysisRequestStatus,

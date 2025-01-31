@@ -1,7 +1,10 @@
 from django.utils.safestring import mark_safe
 import base64
 from rest_framework import serializers
-from api.models.analysis_machine_learning_model import AnalysisMachineLearningModel
+from api.models.analysis_machine_learning_model import (
+    AnalysisMachineLearningModel,
+)
+
 
 class AnalysisMachineLearningModelSerializer(serializers.ModelSerializer):
     parameter_name = serializers.CharField(
@@ -12,7 +15,7 @@ class AnalysisMachineLearningModelSerializer(serializers.ModelSerializer):
     def get_static_map_base64(self, obj):
         """Convert binary static_map to base64 string for frontend display"""
         if obj.static_map:
-            return base64.b64encode(obj.static_map).decode('utf-8')
+            return base64.b64encode(obj.static_map).decode("utf-8")
         return None
 
     def to_representation(self, instance):

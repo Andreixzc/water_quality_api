@@ -5,7 +5,6 @@ from api.serializers.analysis_request_serializer import (
 from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.exceptions import PermissionDenied
 
 
 class AnalysisRequestViewSet(viewsets.ModelViewSet):
@@ -28,14 +27,10 @@ class AnalysisRequestViewSet(viewsets.ModelViewSet):
             start_date=start_date,
             end_date=end_date,
             properties=properties,
+            created_by=self.request.user,
         )
         serializer = AnalysisRequestSerializer(wqa_request)
         return Response(
             serializer.data,
             status=status.HTTP_201_CREATED,
         )
-
-    def perform_create(self, serializer):
-        if not self.request.user.is_authenticated:
-            raise PermissionDenied("User not authenticated.")
-        serializer.save(created_by=self.request.user)
