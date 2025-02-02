@@ -141,4 +141,6 @@ GitHub.sublime-settings
 
 
 # Google credencials #
+processing/credentials/processing/services/credentials/client_secrets.json
+processing/services/credentials/client_secrets.json
 processing/credentials/
