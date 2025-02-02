@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Water Analysis Viewer</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <style>
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            width: 90%;
+            max-width: 1200px;
+            height: 80%;
+            border-radius: 8px;
+            position: relative;
+        }
+        .modal-close {
+            position: absolute;
+            right: 20px;
+            top: 10px;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        .loading {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- Login Section -->
+    <div id="loginSection" class="min-h-screen flex items-center justify-center">
+        <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
+            <h2 class="text-2xl font-bold mb-6 text-center">Water Analysis Portal</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" id="email" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Password</label>
+                    <input type="password" id="password" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border">
+                </div>
+                <button onclick="login()" class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700">
+                    Login
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Section -->
+    <div id="mainSection" class="hidden">
+        <nav class="bg-white shadow-lg">
+            <div class="max-w-7xl mx-auto px-4 py-3">
+                <div class="flex justify-between items-center">
+                    <h1 class="text-xl font-bold">Water Analysis Portal</h1>
+                    <button onclick="logout()" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <div class="max-w-7xl mx-auto px-4 py-6">
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Reservoir</label>
+                        <select id="reservoirSelect" class="w-full border rounded-md p-2">
+                            <option value="">Select Reservoir</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Analysis Group</label>
+                        <select id="groupSelect" class="w-full border rounded-md p-2">
+                            <option value="">Select Group</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Parameter</label>
+                        <select id="parameterSelect" class="w-full border rounded-md p-2">
+                            <option value="">Select Parameter</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+                        <div class="flex space-x-2">
+                            <input type="date" id="startDate" class="flex-1 border rounded-md p-2">
+                            <input type="date" id="endDate" class="flex-1 border rounded-md p-2">
+                        </div>
+                    </div>
+                </div>
+                <button onclick="fetchMaps()" class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700">
+                    View Maps
+                </button>
+            </div>
+
+            <div id="mapsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Interactive Map -->
+    <div id="mapModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+            <div id="modalContent" class="h-full"></div>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loading" class="loading">
+        Loading...
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000';
+
+        async function login() {
+            showLoading();
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/login/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: document.getElementById('email').value,
+                        password: document.getElementById('password').value
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Login failed');
+                }
+
+                const data = await response.json();
+                localStorage.setItem('token', data.access);
+                localStorage.setItem('refreshToken', data.refresh);
+                
+                showMainSection();
+                await loadReservoirs();
+            } catch (error) {
+                alert(error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('refreshToken');
+            showLoginSection();
+        }
+
+        async function loadReservoirs() {
+            showLoading();
+            try {
+                const reservoirs = await fetchAPI('/api/reservoirs/');
+                populateSelect('reservoirSelect', reservoirs, 'id', 'name', 'Select Reservoir');
+                document.getElementById('reservoirSelect').onchange = function() {
+                    loadGroups(this.value);
+                };
+            } catch (error) {
+                alert(error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function loadGroups(reservoirId) {
+            if (!reservoirId) return;
+            showLoading();
+            try {
+                const groups = await fetchAPI(`/api/analysis-parameters/groups/?reservoir_id=${reservoirId}`);
+                populateSelect('groupSelect', groups, 'id', 
+                    g => `Analysis ${g.id} (${g.start_date} to ${g.end_date})`, 
+                    'Select Analysis Group'
+                );
+                document.getElementById('groupSelect').onchange = function() {
+                    loadParameters(this.value);
+                };
+            } catch (error) {
+                alert(error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function loadParameters(groupId) {
+            if (!groupId) return;
+            showLoading();
+            try {
+                const parameters = await fetchAPI('/api/parameters/');
+                populateSelect('parameterSelect', parameters, 'id', 'name', 'Select Parameter');
+            } catch (error) {
+                alert(error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function fetchMaps() {
+            showLoading();
+            try {
+                const groupId = document.getElementById('groupSelect').value;
+                const parameterId = document.getElementById('parameterSelect').value;
+                const startDate = document.getElementById('startDate').value;
+                const endDate = document.getElementById('endDate').value;
+                
+                const query = `group_id=${groupId}&parameter_id=${parameterId}` +
+                    (startDate ? `&start_date=${startDate}` : '') +
+                    (endDate ? `&end_date=${endDate}` : '');
+                
+                const analyses = await fetchAPI(`/api/analysis-parameters/by_group/?${query}`);
+                displayMaps(analyses);
+            } catch (error) {
+                alert(error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function displayMaps(analyses) {
+            const container = document.getElementById('mapsContainer');
+            container.innerHTML = '';
+            
+            analyses.forEach(analysis => {
+                if (analysis.static_map_base64 || analysis.intensity_map) {
+                    const card = document.createElement('div');
+                    card.className = 'bg-white rounded-lg shadow overflow-hidden';
+                    
+                    let content = `
+                        <div class="relative">
+                            <img src="data:image/png;base64,${analysis.static_map_base64}" 
+                                class="w-full h-48 object-cover cursor-pointer"
+                                onclick="openImageInNewTab('data:image/png;base64,${analysis.static_map_base64}')">
+                            <div class="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white p-2">
+                                ${new Date(analysis.analysis.analysis_date).toLocaleDateString()}
+                            </div>
+                        </div>
+                        <div class="p-4">
+                            <div class="flex space-x-2">
+                                <button onclick="openImageInNewTab('data:image/png;base64,${analysis.static_map_base64}')"
+                                    class="flex-1 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                                    Open Image
+                                </button>
+                                <button onclick="openMapInNewTab('${analysis.intensity_map}')"
+                                    class="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                                    Open Map
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    
+                    card.innerHTML = content;
+                    container.appendChild(card);
+                }
+            });
+
+            if (container.children.length === 0) {
+                container.innerHTML = '<p class="text-gray-500">No maps available for the selected criteria</p>';
+            }
+        }
+
+        function openImageInNewTab(imageSrc) {
+            const newTab = window.open();
+            newTab.document.write(`<img src="${imageSrc}" alt="Static Map" style="width:100%;height:100%;">`);
+        }
+
+        function openMapInNewTab(mapHtml) {
+            const newTab = window.open();
+            newTab.document.write(mapHtml);
+        }
+
+        function showInteractiveMap(mapHtml) {
+            const modal = document.getElementById('mapModal');
+            const content = document.getElementById('modalContent');
+            content.innerHTML = mapHtml;
+            modal.style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('mapModal').style.display = 'none';
+        }
+
+        async function fetchAPI(endpoint) {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                showLoginSection();
+                throw new Error('Authentication required');
+            }
+
+            const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (response.status === 401) {
+                // Token might be expired, try to refresh it
+                try {
+                    const newToken = await refreshToken();
+                    localStorage.setItem('token', newToken);
+                    return fetchAPI(endpoint); // Retry the request with the new token
+                } catch (error) {
+                    logout();
+                    throw new Error('Session expired. Please log in again.');
+                }
+            }
+
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response.json();
+        }
+
+        async function refreshToken() {
+            const refreshToken = localStorage.getItem('refreshToken');
+            if (!refreshToken) {
+                throw new Error('No refresh token available');
+            }
+
+            const response = await fetch(`${API_BASE_URL}/api/login/refresh/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    refresh: refreshToken
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to refresh token');
+            }
+
+            const data = await response.json();
+            return data.access;
+        }
+
+        function populateSelect(selectId, items, valueKey, textKey, defaultText) {
+            const select = document.getElementById(selectId);
+            select.innerHTML = `<option value="">${defaultText}</option>`;
+            items.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item[valueKey];
+                option.textContent = typeof textKey === 'function' ? textKey(item) : item[textKey];
+                select.appendChild(option);
+            });
+        }
+
+        function showMainSection() {
+            document.getElementById('loginSection').classList.add('hidden');
+            document.getElementById('mainSection').classList.remove('hidden');
+        }
+
+        function showLoginSection() {
+            document.getElementById('loginSection').classList.remove('hidden');
+            document.getElementById('mainSection').classList.add('hidden');
+        }
+
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('mapModal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Check authentication on load
+        window.onload = () => {
+            const token = localStorage.getItem('token');
+            if (token) {
+                showMainSection();
+                loadReservoirs();
+            } else {
+                showLoginSection();
+            }
+        };
+    </script>
+</body>
+</html>
