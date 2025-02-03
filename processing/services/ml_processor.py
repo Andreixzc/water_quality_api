@@ -48,9 +48,14 @@ class WaterQualityPredictor:
         fai = b8 - (b4 + (b11 - b4) * (nir_wl - red_wl) / (swir_wl - red_wl))
         
         # Calculate band ratios
-        b3_b2_ratio = np.where(b2 != 0, b3 / b2, 0)
-        b4_b3_ratio = np.where(b3 != 0, b4 / b3, 0)
-        b5_b4_ratio = np.where(b4 != 0, b5 / b4, 0)
+        b3_b2_ratio = np.where((b2 != 0) & (b3 != 0), b3 / b2, 0)
+        b4_b3_ratio = np.where((b3 != 0) & (b4 != 0), b4 / b3, 0)
+        b5_b4_ratio = np.where((b4 != 0) & (b5 != 0), b5 / b4, 0)
+
+        
+        # b3_b2_ratio = np.where(b2 != 0, b3 / b2, 0)
+        # b4_b3_ratio = np.where(b3 != 0, b4 / b3, 0)
+        # b5_b4_ratio = np.where(b4 != 0, b5 / b4, 0)
         
         # Create water mask
         water_mask = mndwi > 0.3
@@ -97,73 +102,63 @@ class WaterQualityPredictor:
         else:
             return np.full(water_mask.shape, -9999, dtype=np.float32)
 
-    def process_image(self, image_path, output_dir, chunk_size=500):
-        """Process a single satellite image in chunks"""
-        print(f"Processing {image_path}...")
+    def process_image(self, image_data, output_file):
+        """Process a single satellite image from memory"""
+        print(f"Processing image data...")
         
-        with rasterio.open(image_path) as src:
-            # Get image information
-            height = src.height
-            width = src.width
-            print(f"Image dimensions: {width}x{height}")
-            
-            # Get date information from the filename
-            import re
-
-            match = re.search(r'\d{4}[-_]\d{2}[-_]\d{2}', Path(image_path).stem)
-            if match:
-                date_str = match.group(0)
-                image_date = datetime.strptime(date_str, '%Y-%m-%d' if '-' in date_str else '%Y_%m_%d')
-                month = image_date.month
+        with rasterio.MemoryFile(image_data) as memfile:
+            with memfile.open() as src:
+                # Get image information
+                height = src.height
+                width = src.width
+                print(f"Image dimensions: {width}x{height}")
+                
+                # Get date information from metadata if available, otherwise use current date
+                image_date = src.tags().get('DATE_ACQUIRED', datetime.now().strftime('%Y-%m-%d'))
+                month = datetime.strptime(image_date, '%Y-%m-%d').month
                 season = ((month + 2) // 3) % 4 + 1
-            else:
-                print(f"Error: No valid date found in filename {image_path}, using current date as fallback.")
-                now = datetime.now()
-                month = now.month
-                season = ((month + 2) // 3) % 4 + 1
-                date_str = now.strftime('%Y_%m_%d')
+                
+                # Prepare output array
+                output_data = np.full((height, width), -9999, dtype=np.float32)
+                
+                # Process image in chunks
+                chunk_size = 500
+                total_chunks = ((height + chunk_size - 1) // chunk_size) * ((width + chunk_size - 1) // chunk_size)
+                chunk_count = 0
+                
+                for y in range(0, height, chunk_size):
+                    y_end = min(y + chunk_size, height)
+                    for x in range(0, width, chunk_size):
+                        x_end = min(x + chunk_size, width)
+                        chunk_count += 1
+                        
+                        print(f"Processing chunk {chunk_count}/{total_chunks} ({(chunk_count/total_chunks)*100:.1f}%)")
+                        
+                        # Read chunk
+                        window = rasterio.windows.Window(x, y, x_end - x, y_end - y)
+                        chunk_data = src.read(window=window)
+                        
+                        try:
+                            chunk_result = self.process_chunk(chunk_data, month, season)
+                            output_data[y:y_end, x:x_end] = chunk_result
+                        except Exception as e:
+                            print(f"Error processing chunk at position ({x},{y}): {str(e)}")
+                            continue
+                
+                # Save predictions
+                with rasterio.MemoryFile() as memfile:
+                    kwargs = src.meta.copy()
+                    kwargs.update({
+                        'driver': 'GTiff',
+                        'count': 1,
+                        'dtype': 'float32',
+                        'nodata': -9999
+                    })
 
-            
-            # Prepare output array
-            output_data = np.full((height, width), -9999, dtype=np.float32)
-            
-            # Process image in chunks
-            total_chunks = ((height + chunk_size - 1) // chunk_size) * ((width + chunk_size - 1) // chunk_size)
-            chunk_count = 0
-            
-            for y in range(0, height, chunk_size):
-                y_end = min(y + chunk_size, height)
-                for x in range(0, width, chunk_size):
-                    x_end = min(x + chunk_size, width)
-                    chunk_count += 1
-                    
-                    print(f"Processing chunk {chunk_count}/{total_chunks} ({(chunk_count/total_chunks)*100:.1f}%)")
-                    
-                    # Read chunk
-                    window = rasterio.windows.Window(x, y, x_end - x, y_end - y)
-                    chunk_data = src.read(window=window)
-                    
-                    try:
-                        chunk_result = self.process_chunk(chunk_data, month, season)
-                        output_data[y:y_end, x:x_end] = chunk_result
-                    except Exception as e:
-                        print(f"Error processing chunk at position ({x},{y}): {str(e)}")
-                        continue
-            
-            # Save predictions
-            os.makedirs(output_dir, exist_ok=True)
-            output_path = os.path.join(output_dir, f"prediction_{date_str}.tif")
-            
-            # Copy metadata from input
-            output_meta = src.meta.copy()
-            output_meta.update({
-                'count': 1,
-                'dtype': 'float32',
-                'nodata': -9999
-            })
-            
-            with rasterio.open(output_path, 'w', **output_meta) as dst:
-                dst.write(output_data.astype(np.float32), 1)
-            
-            print(f"Saved prediction to {output_path}")
-            return output_path
+                    with memfile.open(**kwargs) as dst:
+                        dst.write(output_data.astype(np.float32), 1)
+
+                    output_file.write(memfile.read())
+                
+                print(f"Saved prediction to output file")
+                return output_file
