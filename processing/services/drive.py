@@ -65,12 +65,9 @@ class DriveService:
         
         return credentials
 
-    def download_folder_contents(self, folder_name: str, local_path: str) -> list:
-        """Downloads all files from a Google Drive folder to a local directory."""
-        print(f"Downloading contents from folder: {folder_name} to {local_path}")
-        
-        # Create local directory if it doesn't exist
-        os.makedirs(local_path, exist_ok=True)
+    def download_folder_contents(self, folder_name: str) -> list:
+        """Downloads all files from a Google Drive folder and returns their content."""
+        print(f"Downloading contents from folder: {folder_name}")
         
         # Search for the folder
         print(f"Searching for folder: {folder_name}")
@@ -98,16 +95,16 @@ class DriveService:
         for file in file_results.get('files', []):
             print(f"Downloading file: {file['name']}")
             request = self.service.files().get_media(fileId=file['id'])
-            file_path = os.path.join(local_path, file['name'])
             
-            with io.FileIO(file_path, 'wb') as fh:
-                downloader = MediaIoBaseDownload(fh, request)
-                done = False
-                while not done:
-                    _, done = downloader.next_chunk()
+            file_content = io.BytesIO()
+            downloader = MediaIoBaseDownload(file_content, request)
+            done = False
+            while not done:
+                _, done = downloader.next_chunk()
             
-            downloaded_files.append(file_path)
-            print(f"Successfully downloaded: {file_path}")
+            file_content.seek(0)
+            downloaded_files.append((file_content.getvalue(), file['name']))
+            print(f"Successfully downloaded: {file['name']}")
             
             # Optionally delete the file from Drive after downloading
             self.service.files().delete(fileId=file['id']).execute()

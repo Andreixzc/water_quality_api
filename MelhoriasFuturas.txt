@@ -1,7 +1,0 @@
-1 - Avaliar se compensa armazenar o próprio raster no banco
-2 - Armazenar imagens sem processamento do banco, para poupar re-download para analises em que as datas coincidirem
-3 - Linkar clound percentage de cada analise, caso o front queira puxar imagens com visibilidade aceitável
-4 - implementar funcionalidade para stackar várias imagens processadas em layers em um mesmo mapa.
-5 - Padronizar esquema de cores diferentes para cada parametro ao gerar os mapas de intensidade.
-6 - Implementar funcionalidade de cancelar a analise atual, não é trivial porque devemos trackear o status atual dela, e cancelar o estado em que ela estiver.
-

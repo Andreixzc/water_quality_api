@@ -1,8 +1,10 @@
+import io
 import uuid
 import os
 import time
 import shutil
 from django.db.models import Count, Max
+from io import BytesIO
 from datetime import datetime, timedelta
 from api.models.analysis_request import AnalysisRequest
 from api.models.machine_learning_model import MachineLearningModel
@@ -135,7 +137,6 @@ def process_request(request_id):
         if new_start_date and new_end_date:
             print(f"Downloading new images from {new_start_date} to {new_end_date}")
             folder_name = f"unprocessed_images_{reservoir.id}"
-            local_folder = os.path.join(settings.MEDIA_ROOT, "unprocessed_satellite_images", folder_name)
             
             extractor = SatelliteImageExtractor()
             tasks_info = extractor.create_export_tasks(
@@ -148,14 +149,14 @@ def process_request(request_id):
             wait_for_export_tasks(tasks_info)
             
             drive_service = DriveService()
-            downloaded_files = drive_service.download_folder_contents(folder_name, local_folder)
+            downloaded_files = drive_service.download_folder_contents(folder_name)
             
-            for file_path in downloaded_files:
-                image_date = extract_date_from_filename(file_path)
+            for file_content, file_name in downloaded_files:
+                image_date = extract_date_from_filename(file_name)
                 UnprocessedSatelliteImage.objects.create(
                     reservoir=reservoir,
                     image_date=image_date,
-                    file_path=file_path
+                    image_file=file_content
                 )
         else:
             print("No new images to download")
@@ -175,16 +176,15 @@ def process_request(request_id):
         for index, model in enumerate(models, 1):
             print(f"Processing with model {index}/{len(models)} (ID: {model.id})")
 
-            output_folder = f"analysis_{analysis_group.id}"
-            output_dir = os.path.join(settings.MEDIA_ROOT, output_folder)
-            os.makedirs(output_dir, exist_ok=True)
-
             predictor = WaterQualityPredictor(model.model_file, model.scaler_file)
 
             for image in all_images:
                 try:
-                    output_path = predictor.process_image(image.file_path, output_dir)
-                    relative_path = os.path.relpath(output_path, settings.MEDIA_ROOT)
+                    # Criar arquivos temporários para o processamento
+                    with BytesIO(image.image_file) as input_file, BytesIO() as output_file:
+                        predictor.process_image(input_file, output_file)
+                        output_file.seek(0)
+                        processed_image = output_file.getvalue()
 
                     analysis = Analysis.objects.create(
                         analysis_group=analysis_group,
@@ -192,14 +192,14 @@ def process_request(request_id):
                         analysis_date=image.image_date,
                     )
 
-                    map_generator = MapGenerator(output_path, analysis.analysis_date)
+                    map_generator = MapGenerator(processed_image, analysis.analysis_date)
 
                     try:
                         html_map = map_generator.create_interactive_map()
                         if not html_map.strip():
                             html_map = None
                         static_map = map_generator.create_static_map()
-                        print(f"Successfully generated maps for {output_path}")
+                        print(f"Successfully generated maps for image dated {image.image_date}")
                     except Exception as e:
                         print(f"Error generating maps: {str(e)}")
                         html_map = None
@@ -208,14 +208,14 @@ def process_request(request_id):
                     analysis_ml_model = AnalysisMachineLearningModel.objects.create(
                         analysis=analysis,
                         machine_learning_model=model,
-                        raster_path=relative_path,
+                        raster_file=processed_image,
                         intensity_map=html_map,
                         static_map=static_map,
                     )
                     print(f"Created AnalysisMachineLearningModel record: {analysis_ml_model.id}")
 
                 except Exception as e:
-                    print(f"Error processing {image.file_path}: {str(e)}")
+                    print(f"Error processing image for date {image.image_date}: {str(e)}")
                     raise
 
         # Update status to completed
