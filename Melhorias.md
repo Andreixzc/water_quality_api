@@ -21,3 +21,7 @@
 2. Modularizar a porra toda, reduzindo o tamanho das funções.  
 3. Escrever documentação básica para facilitar a integração com o front-end.  
 4. Especificar como autenticar no EE e como pegar a chave da api do google.
+
+
+## Funcionalidades a se pensar?
+1. Futuramente, feature para analise arbitrária de reservatorio com um modelo genèrico, treinado com dados de todos os fodendos reservatorios.
