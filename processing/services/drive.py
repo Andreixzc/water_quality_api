@@ -8,6 +8,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 import pickle
 import io
+from typing import List, Dict
 
 class DriveService:
     def __init__(self):
@@ -65,10 +66,10 @@ class DriveService:
         
         return credentials
 
-    def download_folder_contents(self, folder_name: str) -> list:
+    def download_folder_contents(self, folder_name: str, tasks_info: List[Dict]) -> list:
         """Downloads all files from a Google Drive folder and returns their content."""
         print(f"Downloading contents from folder: {folder_name}")
-        
+        print("Received tasks_info:", tasks_info)  # Debug print
         # Search for the folder
         print(f"Searching for folder: {folder_name}")
         folder_results = self.service.files().list(
@@ -90,9 +91,11 @@ class DriveService:
         ).execute()
         
         downloaded_files = []
-        
-        print(f"Found {len(file_results.get('files', []))} files to download")
         for file in file_results.get('files', []):
+            task_info = next((task for task in tasks_info if task['filename'] == file['name'].rstrip('.tif')), None)
+            cloud_percentage = task_info['cloud_percentage'] if task_info else None
+            print(f"File: {file['name']}, Found task_info: {task_info is not None}, Cloud percentage: {cloud_percentage}")
+
             print(f"Downloading file: {file['name']}")
             request = self.service.files().get_media(fileId=file['id'])
             
@@ -103,10 +106,6 @@ class DriveService:
                 _, done = downloader.next_chunk()
             
             file_content.seek(0)
-            
-            # Get the cloud percentage from the file properties
-            file_metadata = self.service.files().get(fileId=file['id'], fields='properties').execute()
-            cloud_percentage = file_metadata.get('properties', {}).get('cloud_percentage')
             
             downloaded_files.append((file_content.getvalue(), file['name'], cloud_percentage))
             print(f"Successfully downloaded: {file['name']} with cloud percentage: {cloud_percentage}")

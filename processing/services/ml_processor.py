@@ -15,9 +15,9 @@ class WaterQualityPredictor:
         if isinstance(scaler_file, memoryview):
             scaler_file = scaler_file.tobytes()
 
-        print(f"Loading model and scaler from binary data...")
-        print(f"Model file size: {len(model_file)} bytes")
-        print(f"Scaler file size: {len(scaler_file)} bytes")
+        #print(f"Loading model and scaler from binary data...")
+        #print(f"Model file size: {len(model_file)} bytes")
+        #print(f"Scaler file size: {len(scaler_file)} bytes")
 
         # Load models using BytesIO
         model_buffer = BytesIO(model_file)
@@ -39,23 +39,29 @@ class WaterQualityPredictor:
         b2, b3, b4, b5, b8, b11 = bands_chunk[0:6]
         
         # Calculate indices
-        mndwi = np.where((b3 + b11) != 0, (b3 - b11) / (b3 + b11), 0)
-        ndci = np.where((b5 + b4) != 0, (b5 - b4) / (b5 + b4), 0)
-        ndvi = np.where((b8 + b4) != 0, (b8 - b4) / (b8 + b4), 0)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            mndwi = np.where((b3 + b11) != 0, (b3 - b11) / (b3 + b11), 0)
+            ndci = np.where((b5 + b4) != 0, (b5 - b4) / (b5 + b4), 0)
+            ndvi = np.where((b8 + b4) != 0, (b8 - b4) / (b8 + b4), 0)
         
         # Calculate FAI
         nir_wl, red_wl, swir_wl = 842, 665, 1610
         fai = b8 - (b4 + (b11 - b4) * (nir_wl - red_wl) / (swir_wl - red_wl))
         
         # Calculate band ratios
-        b3_b2_ratio = np.where((b2 != 0) & (b3 != 0), b3 / b2, 0)
-        b4_b3_ratio = np.where((b3 != 0) & (b4 != 0), b4 / b3, 0)
-        b5_b4_ratio = np.where((b4 != 0) & (b5 != 0), b5 / b4, 0)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            b3_b2_ratio = np.where((b2 != 0) & (b3 != 0), b3 / b2, 0)
+            b4_b3_ratio = np.where((b3 != 0) & (b4 != 0), b4 / b3, 0)
+            b5_b4_ratio = np.where((b4 != 0) & (b5 != 0), b5 / b4, 0)
 
-        
-        # b3_b2_ratio = np.where(b2 != 0, b3 / b2, 0)
-        # b4_b3_ratio = np.where(b3 != 0, b4 / b3, 0)
-        # b5_b4_ratio = np.where(b4 != 0, b5 / b4, 0)
+        # Replace NaN and inf values with 0
+        mndwi = np.nan_to_num(mndwi)
+        ndci = np.nan_to_num(ndci)
+        ndvi = np.nan_to_num(ndvi)
+        fai = np.nan_to_num(fai)
+        b3_b2_ratio = np.nan_to_num(b3_b2_ratio)
+        b4_b3_ratio = np.nan_to_num(b4_b3_ratio)
+        b5_b4_ratio = np.nan_to_num(b5_b4_ratio)
         
         # Create water mask
         water_mask = mndwi > 0.3
@@ -104,14 +110,14 @@ class WaterQualityPredictor:
 
     def process_image(self, image_data, output_file):
         """Process a single satellite image from memory"""
-        print(f"Processing image data...")
+        #print(f"Processing image data...")
         
         with rasterio.MemoryFile(image_data) as memfile:
             with memfile.open() as src:
                 # Get image information
                 height = src.height
                 width = src.width
-                print(f"Image dimensions: {width}x{height}")
+                #print(f"Image dimensions: {width}x{height}")
                 
                 # Get date information from metadata if available, otherwise use current date
                 image_date = src.tags().get('DATE_ACQUIRED', datetime.now().strftime('%Y-%m-%d'))
@@ -132,7 +138,7 @@ class WaterQualityPredictor:
                         x_end = min(x + chunk_size, width)
                         chunk_count += 1
                         
-                        print(f"Processing chunk {chunk_count}/{total_chunks} ({(chunk_count/total_chunks)*100:.1f}%)")
+                        #print(f"Processing chunk {chunk_count}/{total_chunks} ({(chunk_count/total_chunks)*100:.1f}%)")
                         
                         # Read chunk
                         window = rasterio.windows.Window(x, y, x_end - x, y_end - y)
@@ -142,7 +148,7 @@ class WaterQualityPredictor:
                             chunk_result = self.process_chunk(chunk_data, month, season)
                             output_data[y:y_end, x:x_end] = chunk_result
                         except Exception as e:
-                            print(f"Error processing chunk at position ({x},{y}): {str(e)}")
+                            #print(f"Error processing chunk at position ({x},{y}): {str(e)}")
                             continue
                 
                 # Save predictions
@@ -160,5 +166,5 @@ class WaterQualityPredictor:
 
                     output_file.write(memfile.read())
                 
-                print(f"Saved prediction to output file")
+                #print(f"Saved prediction to output file")
                 return output_file

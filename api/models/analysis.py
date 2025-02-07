@@ -18,7 +18,7 @@ class Analysis(models.Model):
     analysis_group = models.ForeignKey(AnalysisGroup, on_delete=models.CASCADE)
     identifier_code = models.UUIDField(unique=True)
     cloud_percentage = models.DecimalField(
-        max_digits=6, decimal_places=5, blank=True, null=True
+        max_digits=8, decimal_places=5, blank=True, null=True
     )
     analysis_date = models.DateField(null=True, blank=True)
 

@@ -123,41 +123,39 @@ def process_request(request_id):
             new_start_date = None
             new_end_date = None
 
+        if new_start_date and new_end_date and new_start_date == new_end_date:
+            new_end_date += timedelta(days=1)
+            
         if new_start_date and new_end_date:
             print(f"Downloading new images from {new_start_date} to {new_end_date}")
             folder_name = f"unprocessed_images_{reservoir.id}"
             
             extractor = SatelliteImageExtractor()
             tasks_info = extractor.create_export_tasks(
-                coordinates=reservoir.coordinates,
-                start_date=new_start_date.isoformat(),
-                end_date=new_end_date.isoformat(),
-                folder_name=folder_name,
-            )
+            coordinates=reservoir.coordinates,
+            start_date=new_start_date.isoformat(),
+            end_date=new_end_date.isoformat(),
+            folder_name=folder_name,
+        )
+            print("Tasks info before wait:", tasks_info)
             
             wait_for_export_tasks(tasks_info)
+            print("Tasks info after wait:", tasks_info)
             
             drive_service = DriveService()
-            downloaded_files = drive_service.download_folder_contents(folder_name)
+            downloaded_files = drive_service.download_folder_contents(folder_name, tasks_info)
             
-            for file_content, file_name in downloaded_files:
+            for file_content, file_name, cloud_percentage in downloaded_files:
                 image_date = extract_date_from_filename(file_name)
+                print(f"Saving image for {image_date} with cloud percentage: {cloud_percentage}")
                 
-                # Find the corresponding task_info
-                task_info = next((task for task in tasks_info if task['filename'] == file_name), None)
-                
-                if task_info:
-                    cloud_percentage = task_info.get('cloud_percentage')
-                    print(f"Saving image for {image_date} with cloud percentage: {cloud_percentage}")  # Debug print
-                    
-                    UnprocessedSatelliteImage.objects.create(
-                        reservoir=reservoir,
-                        image_date=image_date,
-                        image_file=file_content,
-                        cloud_percentage=cloud_percentage
-                    )
-                else:
-                    print(f"Warning: No task info found for {file_name}")
+                unprocessed_image = UnprocessedSatelliteImage.objects.create(
+                    reservoir=reservoir,
+                    image_date=image_date,
+                    image_file=file_content,
+                    cloud_percentage=cloud_percentage
+                )
+                print(f"Created UnprocessedSatelliteImage with id: {unprocessed_image.id}, cloud_percentage: {unprocessed_image.cloud_percentage}")
         else:
             print("No new images to download")
 
@@ -225,6 +223,7 @@ def process_request(request_id):
         request.analysis_request_status_id = AnalysisRequestStatusEnum.FAILED.value
         request.save()
         raise
+
 
 def extract_date_from_filename(filename):
     import re

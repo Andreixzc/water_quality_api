@@ -206,20 +206,21 @@ class MapGenerator:
                 return m._repr_html_()
 
     def create_static_map(self):
-        """Creates a static matplotlib map and returns PNG as bytes"""
         with rasterio.MemoryFile(self.raster_data) as memfile:
             with memfile.open() as src:
                 data = src.read(1)
                 masked_data = np.ma.masked_equal(data, -9999)
+                
+                if masked_data.count() == 0:
+                    print("No valid data for static map generation")
+                    return None
 
-                # Create figure with 'Agg' backend
                 plt.figure(figsize=(12, 8))
                 im = plt.imshow(masked_data, cmap="YlOrRd")
                 plt.colorbar(im, label="Parameter Concentration")
 
-                # Save to BytesIO instead of file
                 buffer = BytesIO()
                 plt.savefig(buffer, format="png", dpi=300, bbox_inches="tight")
-                plt.close()  # Make sure to close the figure
+                plt.close()
 
                 return buffer.getvalue()

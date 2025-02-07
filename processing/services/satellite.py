@@ -47,17 +47,20 @@ class SatelliteImageExtractor:
         )
         
         collection_to_export = daily.map(self._prepare_for_export)
-        image_list = collection_to_export.toList(collection_to_export.size())
+        size = collection_to_export.size().getInfo()
+        if size == 0:
+            print(f"No images found between {start_date} and {end_date}")
+            return []
+        image_list = collection_to_export.toList(size)
         
         # Start exports and collect task information
         tasks_info = []
-        size = collection_to_export.size().getInfo()
-        
         for i in range(size):
             image = image_list.get(i)
             task_info = self._create_export_task(image, aoi, folder_name)
             tasks_info.append(task_info)
-            
+        
+        print("Tasks info:", tasks_info)  # Debug print
         return tasks_info
 
     def _prepare_for_export(self, image):
@@ -119,7 +122,6 @@ class SatelliteImageExtractor:
         return final_image.set("cloud_percentage", cloud_percentage).set("system:time_start", image.get("system:time_start"))
         
     def _create_export_task(self, image, aoi, folder_name):
-        """Creates a single export task and returns task information"""
         image = ee.Image(image)
         date = ee.Date(image.get("system:time_start")).format("yyyy-MM-dd").getInfo()
         cloud_percentage = image.get("cloud_percentage").getInfo()
@@ -151,7 +153,6 @@ class SatelliteImageExtractor:
             "status": "STARTED",
             "cloud_percentage": cloud_percentage
         }
-
 def calculate_cloud_percentage(image, aoi):
     """Calculates the cloud percentage in the image"""
     scl = image.select('SCL')
