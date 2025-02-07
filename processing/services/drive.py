@@ -103,8 +103,13 @@ class DriveService:
                 _, done = downloader.next_chunk()
             
             file_content.seek(0)
-            downloaded_files.append((file_content.getvalue(), file['name']))
-            print(f"Successfully downloaded: {file['name']}")
+            
+            # Get the cloud percentage from the file properties
+            file_metadata = self.service.files().get(fileId=file['id'], fields='properties').execute()
+            cloud_percentage = file_metadata.get('properties', {}).get('cloud_percentage')
+            
+            downloaded_files.append((file_content.getvalue(), file['name'], cloud_percentage))
+            print(f"Successfully downloaded: {file['name']} with cloud percentage: {cloud_percentage}")
             
             # Optionally delete the file from Drive after downloading
             self.service.files().delete(fileId=file['id']).execute()

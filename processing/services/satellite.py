@@ -20,6 +20,7 @@ class SatelliteImageExtractor:
             List of dictionaries containing task information
         """
         # Define area of interest
+        self.coordinates = coordinates
         aoi = ee.Geometry.Polygon([coordinates])
         
         # Filter image collection
@@ -27,7 +28,6 @@ class SatelliteImageExtractor:
             .filterBounds(aoi)
             .filterDate(start_date, end_date)
             .map(lambda image: image.set("date", image.date().format("yyyy-MM-dd"))))
-        
         
         # Create daily mosaics
         daily = ee.ImageCollection(
@@ -112,12 +112,18 @@ class SatelliteImageExtractor:
         # Apply mask to all bands
         final_image = final_image.updateMask(valid_mask)
         
-        return final_image.set("system:time_start", image.get("system:time_start"))
+        # Calculate cloud percentage
+        aoi = ee.Geometry.Polygon(self.coordinates)
+        cloud_percentage = calculate_cloud_percentage(image, aoi)
+        
+        return final_image.set("cloud_percentage", cloud_percentage).set("system:time_start", image.get("system:time_start"))
         
     def _create_export_task(self, image, aoi, folder_name):
         """Creates a single export task and returns task information"""
         image = ee.Image(image)
         date = ee.Date(image.get("system:time_start")).format("yyyy-MM-dd").getInfo()
+        cloud_percentage = image.get("cloud_percentage").getInfo()
+        print(f"Cloud percentage for {date}: {cloud_percentage}")
         
         # Create filename with date
         filename = f"{folder_name}_{date}"
@@ -142,5 +148,29 @@ class SatelliteImageExtractor:
             "date": date,
             "folder": folder_name,
             "filename": filename,
-            "status": "STARTED"
+            "status": "STARTED",
+            "cloud_percentage": cloud_percentage
         }
+
+def calculate_cloud_percentage(image, aoi):
+    """Calculates the cloud percentage in the image"""
+    scl = image.select('SCL')
+    cloud_mask = scl.eq(8).Or(scl.eq(9)).Or(scl.eq(3))  # 8: cloud medium probability, 9: cloud high probability, 3: cloud shadows
+    
+    total_pixels = ee.Number(scl.reduceRegion(
+        reducer=ee.Reducer.count(),
+        geometry=aoi,
+        scale=10,
+        maxPixels=1e13
+    ).get('SCL'))
+    
+    cloud_pixels = ee.Number(cloud_mask.reduceRegion(
+        reducer=ee.Reducer.sum(),
+        geometry=aoi,
+        scale=10,
+        maxPixels=1e13
+    ).get('SCL'))
+    
+    cloud_percentage = cloud_pixels.divide(total_pixels).multiply(100)
+    
+    return cloud_percentage

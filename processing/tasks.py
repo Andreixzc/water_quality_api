@@ -32,13 +32,11 @@ def wait_for_export_tasks(tasks_info, max_wait_time=60000, check_interval=30):
     start_time = time.time()
 
     while True:
-        # Check if we've exceeded max wait time
         if time.time() - start_time > max_wait_time:
             raise TimeoutError(
                 "Export tasks did not complete within the maximum wait time"
             )
 
-        # Check status of all tasks
         all_completed = True
         for task_info in tasks_info:
             task = ee.batch.Task.list()
@@ -63,7 +61,7 @@ def wait_for_export_tasks(tasks_info, max_wait_time=60000, check_interval=30):
             break
 
         print(
-            f"Tasks still running, checking again in {check_interval} seconds..."  # noqa
+            f"Tasks still running, checking again in {check_interval} seconds..."
         )
         time.sleep(check_interval)
 
@@ -81,28 +79,23 @@ def check_for_new_requests():
 def process_request(request_id):
     request = AnalysisRequest.objects.get(id=request_id)
     try:
-        # Get models
         print(f"Processing request {request_id}")
         model_ids = request.properties.get("model_ids", [])
         models = MachineLearningModel.objects.filter(id__in=model_ids)
 
-        # Validate all models are from the same reservoir
         distinct_reservoirs = models.values("reservoir").distinct()
         if distinct_reservoirs.count() > 1:
             raise ValueError("All models must be from the same reservoir")
 
-        # Check for duplicate parameters
         parameter_counts = models.values("parameter").annotate(count=Count("parameter"))
         duplicate_parameters = [p["parameter"] for p in parameter_counts if p["count"] > 1]
 
         if duplicate_parameters:
             raise ValueError(f"Multiple models found for the same parameter(s): {duplicate_parameters}")
 
-        # Get the reservoir (now we know all models have the same reservoir)
         reservoir = models.first().reservoir
         print(f"Using reservoir: {reservoir.name}")
 
-        # Create AnalysisGroup first
         analysis_group = AnalysisGroup.objects.create(
             reservoir=reservoir,
             identifier_code=uuid.uuid4(),
@@ -113,16 +106,13 @@ def process_request(request_id):
         request.analysis_request_status_id = AnalysisRequestStatusEnum.DOWNLOADING_IMAGES.value
         request.save()
 
-        # Marcar registros existentes no intervalo de data
         marked_images = UnprocessedSatelliteImage.objects.filter(
             reservoir=reservoir,
             image_date__range=(request.start_date, request.end_date)
         )
         
-        # Encontrar a última data marcada
         last_marked_date = marked_images.aggregate(Max('image_date'))['image_date__max']
 
-        # Definir novo intervalo de data para download, se necessário
         if last_marked_date and last_marked_date < request.end_date:
             new_start_date = last_marked_date + timedelta(days=1)
             new_end_date = request.end_date
@@ -133,7 +123,6 @@ def process_request(request_id):
             new_start_date = None
             new_end_date = None
 
-        # Realizar o download de novas imagens, se necessário
         if new_start_date and new_end_date:
             print(f"Downloading new images from {new_start_date} to {new_end_date}")
             folder_name = f"unprocessed_images_{reservoir.id}"
@@ -153,25 +142,33 @@ def process_request(request_id):
             
             for file_content, file_name in downloaded_files:
                 image_date = extract_date_from_filename(file_name)
-                UnprocessedSatelliteImage.objects.create(
-                    reservoir=reservoir,
-                    image_date=image_date,
-                    image_file=file_content
-                )
+                
+                # Find the corresponding task_info
+                task_info = next((task for task in tasks_info if task['filename'] == file_name), None)
+                
+                if task_info:
+                    cloud_percentage = task_info.get('cloud_percentage')
+                    print(f"Saving image for {image_date} with cloud percentage: {cloud_percentage}")  # Debug print
+                    
+                    UnprocessedSatelliteImage.objects.create(
+                        reservoir=reservoir,
+                        image_date=image_date,
+                        image_file=file_content,
+                        cloud_percentage=cloud_percentage
+                    )
+                else:
+                    print(f"Warning: No task info found for {file_name}")
         else:
             print("No new images to download")
 
-        # Obter todas as imagens relevantes (marcadas + novas)
         all_images = UnprocessedSatelliteImage.objects.filter(
             reservoir=reservoir,
             image_date__range=(request.start_date, request.end_date)
         )
 
-        # Update status to start processing
         request.analysis_request_status_id = AnalysisRequestStatusEnum.PROCESSING_IMAGES.value
         request.save()
 
-        # Process each model
         print("\n=== Starting ML Processing ===")
         for index, model in enumerate(models, 1):
             print(f"Processing with model {index}/{len(models)} (ID: {model.id})")
@@ -180,16 +177,16 @@ def process_request(request_id):
 
             for image in all_images:
                 try:
-                    # Criar arquivos temporários para o processamento
                     with BytesIO(image.image_file) as input_file, BytesIO() as output_file:
                         predictor.process_image(input_file, output_file)
                         output_file.seek(0)
                         processed_image = output_file.getvalue()
-
+                    
                     analysis = Analysis.objects.create(
                         analysis_group=analysis_group,
                         identifier_code=uuid.uuid4(),
                         analysis_date=image.image_date,
+                        cloud_percentage=image.cloud_percentage
                     )
 
                     map_generator = MapGenerator(processed_image, analysis.analysis_date)
@@ -218,7 +215,6 @@ def process_request(request_id):
                     print(f"Error processing image for date {image.image_date}: {str(e)}")
                     raise
 
-        # Update status to completed
         request.analysis_request_status_id = AnalysisRequestStatusEnum.COMPLETED.value
         request.save()
         print(f"Completed processing request {request_id}")
@@ -240,27 +236,3 @@ def extract_date_from_filename(filename):
 def daterange(start_date, end_date):
     for n in range(int((end_date - start_date).days) + 1):
         yield start_date + timedelta(n)
-
-def wait_for_export_tasks(tasks_info, max_wait_time=60000, check_interval=30):
-    import ee
-    start_time = time.time()
-    while True:
-        if time.time() - start_time > max_wait_time:
-            raise TimeoutError("Export tasks did not complete within the maximum wait time")
-        all_completed = True
-        for task_info in tasks_info:
-            task = ee.batch.Task.list()
-            current_task = next((t for t in task if t.id == task_info["task_id"]), None)
-            if not current_task:
-                raise Exception(f"Task {task_info['task_id']} not found")
-            state = current_task.state
-            if state in ["FAILED", "CANCELLED"]:
-                raise Exception(f"Task {task_info['task_id']} {state}")
-            elif state != "COMPLETED":
-                all_completed = False
-                break
-        if all_completed:
-            print("All export tasks completed successfully!")
-            break
-        print(f"Tasks still running, checking again in {check_interval} seconds...")
-        time.sleep(check_interval)
