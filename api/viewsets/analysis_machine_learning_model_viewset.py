@@ -5,8 +5,10 @@ from rest_framework.decorators import action
 from api.models.analysis_machine_learning_model import AnalysisMachineLearningModel
 from api.models.analysis import AnalysisGroup 
 from api.serializers.analysis_machine_learning_model_serializer import AnalysisMachineLearningModelSerializer
+from rest_framework import viewsets
+from rest_framework import generics, mixins, views, viewsets
 
-class AnalysisMachineLearningModelViewSet(viewsets.ModelViewSet):
+class AnalysisMachineLearningModelViewSet(viewsets.GenericViewSet):
     serializer_class = AnalysisMachineLearningModelSerializer
     queryset = AnalysisMachineLearningModel.objects.all()
 
@@ -16,7 +18,6 @@ class AnalysisMachineLearningModelViewSet(viewsets.ModelViewSet):
         start_date = request.query_params.get("start_date")
         end_date = request.query_params.get("end_date")
         group_id = request.query_params.get("group_id")  # New parameter
-        print("00000000000000000000000")
         print(parameters_id, reservoir_id, start_date, end_date, group_id)
 
 

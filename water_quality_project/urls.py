@@ -18,11 +18,16 @@ from api.viewsets.machine_learning_model_viewset import (
     MachineLearningModelViewSet,
 )
 from api.viewsets.analysis_request_viewset import AnalysisRequestViewSet
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularRedocView,
+    SpectacularSwaggerView
+)
 
 router = DefaultRouter()
 router.register(r"users", UserViewSet)
 router.register(r"reservoirs", ReservoirViewSet)
-router.register(r"reservoir-users", ReservoirUserViewSet)
+#router.register(r"reservoir-users", ReservoirUserViewSet)
 router.register(r"parameters", ParameterViewSet)
 router.register(
     r"analysis-parameters",
@@ -45,4 +50,7 @@ urlpatterns = [
         TokenRefreshView.as_view(permission_classes=[AllowAny]),
         name="token_refresh",
     ),
+    path("schema/", SpectacularAPIView.as_view(), name="schema"),
+    path("api/docs/", SpectacularSwaggerView.as_view()),
+    path("api/redoc/", SpectacularRedocView.as_view()),
 ]

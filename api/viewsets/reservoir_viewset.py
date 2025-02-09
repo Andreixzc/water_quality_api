@@ -3,9 +3,16 @@ from rest_framework.exceptions import PermissionDenied
 from api.models.reservoir import Reservoir
 from api.serializers.reservoir_serializer import ReservoirSerializer
 from rest_framework import viewsets
+from rest_framework import viewsets
+from rest_framework import generics, mixins, views, viewsets
+from rest_framework import viewsets
+from rest_framework import generics, mixins, views, viewsets
 
 
-class ReservoirViewSet(viewsets.ModelViewSet):
+class ReservoirViewSet(mixins.CreateModelMixin,
+                   mixins.RetrieveModelMixin,
+                   mixins.ListModelMixin,
+                   viewsets.GenericViewSet):
     queryset = Reservoir.objects.all()
     serializer_class = ReservoirSerializer
     permission_classes = [IsAuthenticated]

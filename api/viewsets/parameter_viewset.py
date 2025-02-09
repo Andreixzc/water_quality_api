@@ -3,9 +3,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import viewsets
 from api.models.parameter import Parameter
 from api.serializers.parameter_serializer import ParameterSerializer
+from rest_framework import viewsets
+from rest_framework import generics, mixins, views, viewsets
 
 
-class ParameterViewSet(viewsets.ModelViewSet):
+class ParameterViewSet(mixins.CreateModelMixin,
+                   viewsets.GenericViewSet):
     queryset = Parameter.objects.all()
     serializer_class = ParameterSerializer
     permission_classes = [IsAuthenticated]

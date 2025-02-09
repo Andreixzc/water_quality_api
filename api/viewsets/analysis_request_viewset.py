@@ -5,9 +5,12 @@ from api.serializers.analysis_request_serializer import (
 from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework import viewsets
+from rest_framework import generics, mixins, views, viewsets
 
 
-class AnalysisRequestViewSet(viewsets.ModelViewSet):
+class AnalysisRequestViewSet(mixins.CreateModelMixin,
+                    viewsets.GenericViewSet):
     queryset = AnalysisRequest.objects.all()
     serializer_class = AnalysisRequestSerializer
     permission_classes = [IsAuthenticated]
