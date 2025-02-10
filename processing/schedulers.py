@@ -8,7 +8,7 @@ def start():
     scheduler = BackgroundScheduler(timezone=settings.TIME_ZONE)
     scheduler.add_jobstore(DjangoJobStore(), "default")
 
-    # Executa a tarefa a cada 5 minutos
+    # Executa a tarefa a cada 1 minutos
     scheduler.add_job(
         check_for_new_requests, "interval", minutes=1, jobstore="default"
     )
