@@ -8,7 +8,9 @@ from rest_framework import generics, mixins, views, viewsets
 
 
 class ParameterViewSet(mixins.CreateModelMixin,
-                   viewsets.GenericViewSet):
+                       mixins.ListModelMixin,  
+                       mixins.RetrieveModelMixin, 
+                       viewsets.GenericViewSet):
     queryset = Parameter.objects.all()
     serializer_class = ParameterSerializer
     permission_classes = [IsAuthenticated]

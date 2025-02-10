@@ -87,6 +87,9 @@ class MapGenerator:
             with memfile.open() as src:
                 data = src.read(1)
                 valid_data = data[data != -9999]
+                if len(valid_data) == 0:
+                    print("No valid data for interactive map generation")
+                    return "<p>No data available (100% cloud coverage or invalid data)</p>"
                 bounds = transform_bounds(src.crs, "EPSG:4326", *src.bounds)
 
                 center_lat = (bounds[1] + bounds[3]) / 2
@@ -205,6 +208,7 @@ class MapGenerator:
 
                 return m._repr_html_()
 
+
     def create_static_map(self):
         with rasterio.MemoryFile(self.raster_data) as memfile:
             with memfile.open() as src:
@@ -213,7 +217,7 @@ class MapGenerator:
                 
                 if masked_data.count() == 0:
                     print("No valid data for static map generation")
-                    return None
+                    return self.create_no_data_map()
 
                 plt.figure(figsize=(12, 8))
                 im = plt.imshow(masked_data, cmap="YlOrRd")
@@ -224,3 +228,15 @@ class MapGenerator:
                 plt.close()
 
                 return buffer.getvalue()
+    
+    def create_no_data_map(self):
+        plt.figure(figsize=(12, 8))
+        plt.text(0.5, 0.5, "No data available (100% cloud coverage or invalid data)",
+                ha='center', va='center', fontsize=16, wrap=True)
+        plt.axis('off')
+        
+        buffer = BytesIO()
+        plt.savefig(buffer, format="png", dpi=300, bbox_inches="tight")
+        plt.close()
+        
+        return buffer.getvalue()
