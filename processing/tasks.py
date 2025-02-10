@@ -23,9 +23,9 @@ from api.models.unprocessed_satellite_image import UnprocessedSatelliteImage
 from django.conf import settings
 
 
-def wait_for_export_tasks(tasks_info, max_wait_time=60000, check_interval=30):
+def wait_for_export_tasks(tasks_info, max_wait_time=6000000, check_interval=30):
     """
-    Wait for Earth Engine export tasks to complete.
+    Função que aguarda a conclusão de tarefas de exportação do Google Earth Engine, checando o seu 'state' a cada 'check_interval' segundos.
     """
     import ee
 
@@ -68,7 +68,7 @@ def wait_for_export_tasks(tasks_info, max_wait_time=60000, check_interval=30):
 
 def check_for_new_requests():
     """
-    Check for new analysis requests in QUEUED status and process them
+    Ceca periodicamente a tabela de análises em busca de novas análises com status "QUEUED" e as processa.
     """
     new_requests = AnalysisRequest.objects.filter(
         analysis_request_status_id=AnalysisRequestStatusEnum.QUEUED.value
@@ -94,7 +94,7 @@ def process_request(request_id):
             raise ValueError(f"Multiple models found for the same parameter(s): {duplicate_parameters}")
 
         reservoir = models.first().reservoir
-        print(f"Using reservoir: {reservoir.name}")
+        #print(f"Using reservoir: {reservoir.name}")
 
         analysis_group = AnalysisGroup.objects.create(
             reservoir=reservoir,
@@ -127,7 +127,7 @@ def process_request(request_id):
             new_end_date += timedelta(days=1)
             
         if new_start_date and new_end_date:
-            print(f"Downloading new images from {new_start_date} to {new_end_date}")
+            #print(f"Downloading new images from {new_start_date} to {new_end_date}")
             folder_name = f"unprocessed_images_{reservoir.id}"
             
             extractor = SatelliteImageExtractor()
@@ -137,17 +137,17 @@ def process_request(request_id):
             end_date=new_end_date.isoformat(),
             folder_name=folder_name,
         )
-            print("Tasks info before wait:", tasks_info)
+            #print("Tasks info before wait:", tasks_info)
             
             wait_for_export_tasks(tasks_info)
-            print("Tasks info after wait:", tasks_info)
+            #print("Tasks info after wait:", tasks_info)
             
             drive_service = DriveService()
             downloaded_files = drive_service.download_folder_contents(folder_name, tasks_info)
             
             for file_content, file_name, cloud_percentage in downloaded_files:
                 image_date = extract_date_from_filename(file_name)
-                print(f"Saving image for {image_date} with cloud percentage: {cloud_percentage}")
+                #print(f"Saving image for {image_date} with cloud percentage: {cloud_percentage}")
                 
                 unprocessed_image = UnprocessedSatelliteImage.objects.create(
                     reservoir=reservoir,
@@ -155,7 +155,7 @@ def process_request(request_id):
                     image_file=file_content,
                     cloud_percentage=cloud_percentage
                 )
-                print(f"Created UnprocessedSatelliteImage with id: {unprocessed_image.id}, cloud_percentage: {unprocessed_image.cloud_percentage}")
+                #print(f"Created UnprocessedSatelliteImage with id: {unprocessed_image.id}, cloud_percentage: {unprocessed_image.cloud_percentage}")
         else:
             print("No new images to download")
 
@@ -167,9 +167,9 @@ def process_request(request_id):
         request.analysis_request_status_id = AnalysisRequestStatusEnum.PROCESSING_IMAGES.value
         request.save()
 
-        print("\n=== Starting ML Processing ===")
+        #print("\n=== Starting ML Processing ===")
         for index, model in enumerate(models, 1):
-            print(f"Processing with model {index}/{len(models)} (ID: {model.id})")
+            #print(f"Processing with model {index}/{len(models)} (ID: {model.id})")
 
             predictor = WaterQualityPredictor(model.model_file, model.scaler_file)
 
@@ -194,9 +194,9 @@ def process_request(request_id):
                         if not html_map.strip():
                             html_map = None
                         static_map = map_generator.create_static_map()
-                        print(f"Successfully generated maps for image dated {image.image_date}")
+                        #print(f"Successfully generated maps for image dated {image.image_date}")
                     except Exception as e:
-                        print(f"Error generating maps: {str(e)}")
+                        #print(f"Error generating maps: {str(e)}")
                         html_map = None
                         static_map = None
 
@@ -207,7 +207,7 @@ def process_request(request_id):
                         intensity_map=html_map,
                         static_map=static_map,
                     )
-                    print(f"Created AnalysisMachineLearningModel record: {analysis_ml_model.id}")
+                    #print(f"Created AnalysisMachineLearningModel record: {analysis_ml_model.id}")
 
                 except Exception as e:
                     print(f"Error processing image for date {image.image_date}: {str(e)}")
@@ -215,11 +215,11 @@ def process_request(request_id):
 
         request.analysis_request_status_id = AnalysisRequestStatusEnum.COMPLETED.value
         request.save()
-        print(f"Completed processing request {request_id}")
+        #print(f"Completed processing request {request_id}")
 
     except Exception as e:
-        print(f"\n!!! Error processing request {request_id} !!!")
-        print(f"Error details: {str(e)}")
+        #print(f"\n!!! Error processing request {request_id} !!!")
+        #print(f"Error details: {str(e)}")
         request.analysis_request_status_id = AnalysisRequestStatusEnum.FAILED.value
         request.save()
         raise

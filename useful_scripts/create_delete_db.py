@@ -1,5 +1,7 @@
 import subprocess
 
+
+#Script auxiliar pra dropar/criar o banco (utilizado apenas em desenvolvimento)
 def execute_command(command):
     """
     Executes a shell command and handles errors.

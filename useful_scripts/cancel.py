@@ -1,6 +1,6 @@
 import ee
 
-# Cancel all tasks for current user
+# Script utilizado para cancelar todas as tarefas pendentes no Google Earth Engine
 # Inicializar a biblioteca Earth Engine
 ee.Initialize()
 
