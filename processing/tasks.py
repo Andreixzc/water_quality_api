@@ -21,6 +21,7 @@ from .services.maps import MapGenerator
 from django.db.models import Count
 from api.models.unprocessed_satellite_image import UnprocessedSatelliteImage
 from django.conf import settings
+import rasterio
 
 
 def wait_for_export_tasks(tasks_info, max_wait_time=6000000, check_interval=30):
@@ -180,6 +181,17 @@ def process_request(request_id):
                         output_file.seek(0)
                         processed_image = output_file.getvalue()
                     
+                    # Check if the processed image has any valid data
+                    with rasterio.MemoryFile(processed_image) as memfile:
+                        with memfile.open() as src:
+                            data = src.read(1)
+                            valid_data = data[data != -9999]
+                            
+                            if len(valid_data) == 0:
+                                print(f"No valid data for image dated {image.image_date}. Skipping.")
+                                continue  # Skip to the next image
+
+                    # If we have valid data, proceed with creating the analysis and maps
                     analysis = Analysis.objects.create(
                         analysis_group=analysis_group,
                         identifier_code=uuid.uuid4(),
@@ -191,12 +203,10 @@ def process_request(request_id):
 
                     try:
                         html_map = map_generator.create_interactive_map()
-                        if not html_map.strip():
-                            html_map = None
                         static_map = map_generator.create_static_map()
-                        #print(f"Successfully generated maps for image dated {image.image_date}")
+                        print(f"Successfully generated maps for image dated {image.image_date}")
                     except Exception as e:
-                        #print(f"Error generating maps: {str(e)}")
+                        print(f"Error generating maps: {str(e)}")
                         html_map = None
                         static_map = None
 
@@ -207,11 +217,11 @@ def process_request(request_id):
                         intensity_map=html_map,
                         static_map=static_map,
                     )
-                    #print(f"Created AnalysisMachineLearningModel record: {analysis_ml_model.id}")
+                    print(f"Created AnalysisMachineLearningModel record: {analysis_ml_model.id}")
 
                 except Exception as e:
                     print(f"Error processing image for date {image.image_date}: {str(e)}")
-                    raise
+                    continue  # Skip to the next image instead of raising an exception
 
         request.analysis_request_status_id = AnalysisRequestStatusEnum.COMPLETED.value
         request.save()

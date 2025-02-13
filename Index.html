@@ -252,45 +252,45 @@
         }
 
         function displayMaps(analyses) {
-            const container = document.getElementById('mapsContainer');
-            container.innerHTML = '';
+    const container = document.getElementById('mapsContainer');
+    container.innerHTML = '';
+    
+    analyses.forEach(analysis => {
+        if (analysis.static_map_base64 && analysis.intensity_map) {
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-lg shadow overflow-hidden';
             
-            analyses.forEach(analysis => {
-                if (analysis.static_map_base64 || analysis.intensity_map) {
-                    const card = document.createElement('div');
-                    card.className = 'bg-white rounded-lg shadow overflow-hidden';
-                    
-                    let content = `
-                        <div class="relative">
-                            <img src="data:image/png;base64,${analysis.static_map_base64}" 
-                                class="w-full h-48 object-cover cursor-pointer"
-                                onclick="openImageInNewTab('data:image/png;base64,${analysis.static_map_base64}')">
-                            <div class="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white p-2">
-                                ${new Date(analysis.analysis.analysis_date).toLocaleDateString()}
-                            </div>
-                        </div>
-                        <div class="p-4">
-                            <div class="flex space-x-2">
-                                <button onclick="openImageInNewTab('data:image/png;base64,${analysis.static_map_base64}')"
-                                    class="flex-1 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-                                    Open Image
-                                </button>
-                                <button onclick="openMapInNewTab('${analysis.intensity_map}')"
-                                    class="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
-                                    Open Map
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                    
-                    card.innerHTML = content;
-                    container.appendChild(card);
-                }
-            });
+            let content = `
+                <div class="relative">
+                    <img src="data:image/png;base64,${analysis.static_map_base64}" 
+                        class="w-full h-48 object-cover cursor-pointer"
+                        onclick="openImageInNewTab('data:image/png;base64,${analysis.static_map_base64}')">
+                    <div class="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white p-2">
+                        ${new Date(analysis.analysis.analysis_date).toLocaleDateString()}
+                    </div>
+                </div>
+                <div class="p-4">
+                    <div class="flex space-x-2">
+                        <button onclick="openImageInNewTab('data:image/png;base64,${analysis.static_map_base64}')"
+                            class="flex-1 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                            Open Image
+                        </button>
+                        <button onclick="openMapInNewTab('${analysis.intensity_map}')"
+                            class="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                            Open Map
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            card.innerHTML = content;
+            container.appendChild(card);
+        }
+    });
 
-            if (container.children.length === 0) {
-                container.innerHTML = '<p class="text-gray-500">No maps available for the selected criteria</p>';
-            }
+    if (container.children.length === 0) {
+        container.innerHTML = '<p class="text-gray-500">No maps available for the selected criteria</p>';
+    }
         }
 
         function openImageInNewTab(imageSrc) {
