@@ -1,6 +1,5 @@
-# processing/services/drive.py
-
 import os
+from google.oauth2 import service_account
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -9,62 +8,25 @@ from googleapiclient.http import MediaIoBaseDownload
 import pickle
 import io
 from typing import List, Dict
+from typing import List, Dict
 
 class DriveService:
     def __init__(self):
         self.SCOPES = [
-        'https://www.googleapis.com/auth/drive',  # Full Drive access
-        'https://www.googleapis.com/auth/drive.file',  # Access to files created by the app
-        'https://www.googleapis.com/auth/drive.metadata.readonly'  # Read metadata
-    ]
-        # Define paths relative to the project root
-        self.base_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        self.credentials_dir = os.path.join(self.base_path, 'processing', 'credentials')
-        self.credentials_path = os.path.join(self.credentials_dir, 'client_secrets.json')
-        self.token_path = os.path.join(self.credentials_dir, 'token.pickle')
-        
-        # Create credentials directory if it doesn't exist
-        if not os.path.exists(self.credentials_dir):
-            os.makedirs(self.credentials_dir)
-            
+            'https://www.googleapis.com/auth/drive',
+            'https://www.googleapis.com/auth/drive.file',
+            'https://www.googleapis.com/auth/drive.metadata.readonly'
+        ]
         self.credentials = self._get_credentials()
         self.service = build('drive', 'v3', credentials=self.credentials)
-    
+
     def _get_credentials(self):
-        """Gets valid user credentials from storage or initiates OAuth2 flow."""
-        credentials = None
+        credentials_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+        if not credentials_path:
+            raise ValueError("GOOGLE_APPLICATION_CREDENTIALS environment variable not set")
         
-        # Check for existing token
-        if os.path.exists(self.token_path):
-            print(f"Loading credentials from {self.token_path}")
-            with open(self.token_path, 'rb') as token:
-                credentials = pickle.load(token)
-        
-        # If credentials don't exist or are invalid
-        if not credentials or not credentials.valid:
-            if credentials and credentials.expired and credentials.refresh_token:
-                print("Refreshing expired credentials")
-                credentials.refresh(Request())
-            else:
-                print(f"Getting new credentials using client secrets from {self.credentials_path}")
-                if not os.path.exists(self.credentials_path):
-                    raise FileNotFoundError(
-                        f"Client secrets file not found at {self.credentials_path}. "
-                        "Please download it from Google Cloud Console and place it in the credentials directory."
-                    )
-                    
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    self.credentials_path,
-                    self.SCOPES
-                )
-                credentials = flow.run_local_server(port=0)
-            
-            # Save credentials for future use
-            print(f"Saving credentials to {self.token_path}")
-            with open(self.token_path, 'wb') as token:
-                pickle.dump(credentials, token)
-        
-        return credentials
+        return service_account.Credentials.from_service_account_file(
+            credentials_path, scopes=self.SCOPES)
 
     def download_folder_contents(self, folder_name: str, tasks_info: List[Dict]) -> list:
         """Downloads all files from a Google Drive folder and returns their content."""

@@ -17,11 +17,25 @@ from datetime import timedelta
 import matplotlib.colors as mcolors
 from PIL import Image
 import ee
-
+from google.oauth2 import service_account
+import os
 
 # Initialize the Earth Engine API
-ee.Initialize()
 
+# Obter o caminho do arquivo de credenciais
+credentials_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+
+if not credentials_path:
+    raise ValueError("GOOGLE_APPLICATION_CREDENTIALS environment variable not set")
+
+# Criar as credenciais
+credentials = service_account.Credentials.from_service_account_file(
+    credentials_path,
+    scopes=['https://www.googleapis.com/auth/earthengine']
+)
+
+# Inicializar o Earth Engine com as credenciais da conta de serviço
+ee.Initialize(credentials)
 
 class MapGenerator:
     """

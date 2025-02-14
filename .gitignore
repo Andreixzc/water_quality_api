@@ -144,3 +144,4 @@ GitHub.sublime-settings
 processing/credentials/processing/services/credentials/client_secrets.json
 processing/services/credentials/client_secrets.json
 processing/credentials/
+.env
