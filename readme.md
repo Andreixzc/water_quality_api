@@ -1,6 +1,8 @@
 
+---
+
 # Requisitos  
-- Docker instalado  
+- **Docker** instalado  
 - Configuração do arquivo `.env`  
 
 # Como rodar  
@@ -35,5 +37,37 @@ GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/water-quality-andrei-57d16a92f3a
 4. Após ativar, vá para **Credenciais** → **Criar credenciais** → **Conta de serviço**  
 5. Selecione a conta criada e vá para **Chaves** → **Adicionar chave** → **Criar nova chave**  
 6. Escolha o formato **JSON** e faça o download.  
+
+# Arquivos adicionais  
+- **`templateEnv.txt`**: Exemplo de configuração do arquivo `.env`.  
+- **`Exemplo.html`**: Página simples de login e interface para seleção de imagens para análise.  
+
+---
+
+# Testando a API  
+Para testar via **Postman**, siga este fluxo:  
+(Tenho que te mandar um exemplo de um modelo/scaler para caso você queira testar, posso te adicionar no postman também dai os arquivos ficam em núvem)
+
+1. **Criar um usuário**  
+2. **Fazer login**  
+3. **Cadastrar um parâmetro**  
+4. **Cadastrar um reservatório**  
+5. **Cadastrar um modelo**  
+6. **Gerar uma análise**  
+
+# Considerações  
+- Ainda **não há** uma rota para cancelar uma análise, pois a implementação é mais complexa.  
+- Caso precise cancelar uma análise longa no **Google Earth Engine**, use o script `cancel.py`, que finaliza todas as tasks pendentes.  
+
+### Como rodar o script de cancelamento:  
+Pode ser necessário executar de uma destas formas:  
+```sh
+docker-compose exec web python cancel.py
+```
+ou  
+```sh
+python cancel.py
+```
+Dependendo do ambiente, um dos comandos funcionará.  
 
 ---
