@@ -18,6 +18,7 @@ from .services.satellite import SatelliteImageExtractor
 from .services.drive import DriveService
 from .services.ml_processor import WaterQualityPredictor
 from .services.maps import MapGenerator
+from .config import ParallelProcessingConfig
 from django.db.models import Count
 from api.models.unprocessed_satellite_image import UnprocessedSatelliteImage
 from django.conf import settings
@@ -168,11 +169,19 @@ def process_request(request_id):
         request.analysis_request_status_id = AnalysisRequestStatusEnum.PROCESSING_IMAGES.value
         request.save()
 
-        #print("\n=== Starting ML Processing ===")
+        #print("\n=== Starting ML Processing with Configurable Parallel Processing ===")
+        ParallelProcessingConfig.print_config()
+        
         for index, model in enumerate(models, 1):
             #print(f"Processing with model {index}/{len(models)} (ID: {model.id})")
 
-            predictor = WaterQualityPredictor(model.model_file, model.scaler_file)
+            # Use configuration-driven parallel processing
+            predictor = WaterQualityPredictor(
+                model.model_file, 
+                model.scaler_file,
+                use_parallel=ParallelProcessingConfig.ENABLE_PARALLEL_PROCESSING,
+                max_workers=ParallelProcessingConfig.get_max_workers()
+            )
 
             for image in all_images:
                 try:
