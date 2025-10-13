@@ -14,7 +14,8 @@ class ParallelProcessingConfig:
     MAX_WORKERS = int(os.getenv('MAX_WORKERS')) if os.getenv('MAX_WORKERS') else None
     
     # Chunk size for processing (in pixels)
-    CHUNK_SIZE = int(os.getenv('CHUNK_SIZE', '500'))
+    # Set to 0 to always enable parallel processing regardless of dataset size
+    CHUNK_SIZE = int(os.getenv('CHUNK_SIZE', '0'))
     
     # Progress reporting interval (every N chunks)
     PROGRESS_INTERVAL = int(os.getenv('PROGRESS_INTERVAL', '10'))

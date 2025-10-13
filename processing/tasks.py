@@ -6,6 +6,7 @@ import shutil
 from django.db.models import Count, Max
 from io import BytesIO
 from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from api.models.analysis_request import AnalysisRequest
 from api.models.machine_learning_model import MachineLearningModel
 from api.models.analysis import Analysis
@@ -234,7 +235,8 @@ def process_request(request_id):
                         month = image.image_date.month
                         season = (month % 12 + 3) // 3  # 1=Spring, 2=Summer, 3=Fall, 4=Winter
                         
-                        for feature in sample_data['features']:
+                        # Helper function to process a single feature/point
+                        def process_feature(feature):
                             pixel_data = feature['properties']
                             # Create a feature vector from the spectral data (15 features total)
                             feature_vector = [
@@ -251,16 +253,49 @@ def process_request(request_id):
                             
                             # Use the ML model to predict water quality for this pixel
                             prediction = predictor.predict_single_pixel(feature_vector)
-                            predictions.append(prediction)
                             
-                            # Store prediction with coordinates for map generation
+                            # Return prediction with coordinates for map generation
+                            result = {'prediction': prediction}
                             if 'geometry' in feature and 'coordinates' in feature['geometry']:
                                 coords = feature['geometry']['coordinates']
-                                predicted_points.append({
-                                    'lon': coords[0],
-                                    'lat': coords[1],
-                                    'prediction': prediction
-                                })
+                                result['lon'] = coords[0]
+                                result['lat'] = coords[1]
+                            
+                            return result
+                        
+                        # Process features in parallel if enabled
+                        if ParallelProcessingConfig.ENABLE_PARALLEL_PROCESSING and len(sample_data['features']) > ParallelProcessingConfig.CHUNK_SIZE:
+                            print(f"Processing {len(sample_data['features'])} points in parallel with {ParallelProcessingConfig.get_max_workers()} workers")
+                            with ThreadPoolExecutor(max_workers=ParallelProcessingConfig.get_max_workers()) as executor:
+                                # Submit all features for processing
+                                future_to_feature = {executor.submit(process_feature, feature): feature 
+                                                    for feature in sample_data['features']}
+                                
+                                # Collect results as they complete
+                                for future in as_completed(future_to_feature):
+                                    try:
+                                        result = future.result()
+                                        predictions.append(result['prediction'])
+                                        if 'lon' in result and 'lat' in result:
+                                            predicted_points.append({
+                                                'lon': result['lon'],
+                                                'lat': result['lat'],
+                                                'prediction': result['prediction']
+                                            })
+                                    except Exception as exc:
+                                        print(f"Feature processing generated an exception: {exc}")
+                        else:
+                            # Sequential processing for small datasets or when parallel is disabled
+                            print(f"Processing {len(sample_data['features'])} points sequentially")
+                            for feature in sample_data['features']:
+                                result = process_feature(feature)
+                                predictions.append(result['prediction'])
+                                if 'lon' in result and 'lat' in result:
+                                    predicted_points.append({
+                                        'lon': result['lon'],
+                                        'lat': result['lat'],
+                                        'prediction': result['prediction']
+                                    })
                         
                         # Calculate average prediction for the image
                         avg_prediction = sum(predictions) / len(predictions) if predictions else 0
