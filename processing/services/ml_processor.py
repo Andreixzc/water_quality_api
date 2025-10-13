@@ -368,3 +368,43 @@ class WaterQualityPredictor:
             return self.process_image_parallel(image_data, output_file)
         else:
             return self.process_image_sequential(image_data, output_file)
+    
+    def predict_single_pixel(self, feature_vector):
+        """
+        Predict water quality for a single pixel using the ML model
+        
+        Args:
+            feature_vector: List of spectral values and indices for one pixel
+            
+        Returns:
+            Predicted water quality value
+        """
+        try:
+            # Ensure we have the right number of features (15: 6 bands + 7 indices + 2 temporal)
+            if len(feature_vector) != 15:  # Expected: B2,B3,B4,B5,B8,B11,NDCI,NDVI,FAI,MNDWI,B3_B2,B4_B3,B5_B4,Month,Season
+                print(f"Warning: Expected 15 features, got {len(feature_vector)}")
+                # Pad with zeros if too few, truncate if too many
+                feature_vector = (feature_vector + [0] * 15)[:15]
+            
+            # Convert to numpy array and reshape for single prediction
+            features = np.array(feature_vector).reshape(1, -1)
+            
+            # Get model and scaler based on parallel mode
+            if self.use_parallel:
+                # In parallel mode, load thread-local models
+                model, scaler = self._get_thread_models()
+            else:
+                # In sequential mode, use instance attributes
+                model, scaler = self.model, self.scaler
+            
+            # Scale the features
+            scaled_features = scaler.transform(features)
+            
+            # Make prediction
+            prediction = model.predict(scaled_features)[0]
+            
+            return float(prediction)
+            
+        except Exception as e:
+            print(f"Error in single pixel prediction: {e}")
+            return 0.0

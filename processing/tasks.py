@@ -41,22 +41,35 @@ def wait_for_export_tasks(tasks_info, max_wait_time=6000000, check_interval=30):
 
         all_completed = True
         for task_info in tasks_info:
-            task = ee.batch.Task.list()
-            current_task = next(
-                (t for t in task if t.id == task_info["task_id"]), None
-            )
+            # Handle direct download tasks (no Earth Engine task needed)
+            if task_info["task_id"].startswith("direct_download_"):
+                if task_info["status"] == "COMPLETED":
+                    print(f"Direct download {task_info['task_id']} completed successfully")
+                    continue
+                else:
+                    print(f"Direct download {task_info['task_id']} failed")
+                    all_completed = False
+                    break
+            elif task_info["task_id"].startswith("failed_download_"):
+                raise Exception(f"Direct download failed: {task_info.get('error', 'Unknown error')}")
+            else:
+                # Handle traditional Earth Engine export tasks
+                task = ee.batch.Task.list()
+                current_task = next(
+                    (t for t in task if t.id == task_info["task_id"]), None
+                )
 
-            if not current_task:
-                raise Exception(f"Task {task_info['task_id']} not found")
+                if not current_task:
+                    raise Exception(f"Task {task_info['task_id']} not found")
 
-            state = current_task.state
+                state = current_task.state
 
-            if state in ["FAILED", "CANCELLED"]:
-                raise Exception(f"Task {task_info['task_id']} {state}")
-            elif state != "COMPLETED":
-                print(f"Task {task_info['task_id']} is {state}")
-                all_completed = False
-                break
+                if state in ["FAILED", "CANCELLED"]:
+                    raise Exception(f"Task {task_info['task_id']} {state}")
+                elif state != "COMPLETED":
+                    print(f"Task {task_info['task_id']} is {state}")
+                    all_completed = False
+                    break
 
         if all_completed:
             print("All export tasks completed successfully!")
@@ -144,20 +157,37 @@ def process_request(request_id):
             wait_for_export_tasks(tasks_info)
             #print("Tasks info after wait:", tasks_info)
             
-            drive_service = DriveService()
-            downloaded_files = drive_service.download_folder_contents(folder_name, tasks_info)
-            
-            for file_content, file_name, cloud_percentage in downloaded_files:
-                image_date = extract_date_from_filename(file_name)
-                #print(f"Saving image for {image_date} with cloud percentage: {cloud_percentage}")
-                
-                unprocessed_image = UnprocessedSatelliteImage.objects.create(
-                    reservoir=reservoir,
-                    image_date=image_date,
-                    image_file=file_content,
-                    cloud_percentage=cloud_percentage
-                )
-                #print(f"Created UnprocessedSatelliteImage with id: {unprocessed_image.id}, cloud_percentage: {unprocessed_image.cloud_percentage}")
+            # Process direct download data instead of Drive files
+            print(f"Processing {len(tasks_info)} directly downloaded satellite images")
+            for task_info in tasks_info:
+                if task_info.get("status") == "COMPLETED" and "sample_data" in task_info:
+                    # Extract image date from task info
+                    image_date_str = task_info.get("date")
+                    image_date = datetime.strptime(image_date_str, "%Y-%m-%d").date()
+                    cloud_percentage = task_info.get("cloud_percentage", 0)
+                    
+                    print(f"Saving directly downloaded image for {image_date} with cloud percentage: {cloud_percentage}")
+                    
+                    # Convert sample data to a format for processing
+                    # For now, we'll store the sample data as JSON in the image_file field
+                    import json
+                    sample_data_json = json.dumps(task_info["sample_data"]).encode('utf-8')
+                    
+                    # Use get_or_create to avoid duplicate key errors
+                    unprocessed_image, created = UnprocessedSatelliteImage.objects.get_or_create(
+                        reservoir=reservoir,
+                        image_date=image_date,
+                        defaults={
+                            'image_file': sample_data_json,  # Store sample data as JSON
+                            'cloud_percentage': cloud_percentage
+                        }
+                    )
+                    if created:
+                        print(f"Created UnprocessedSatelliteImage with id: {unprocessed_image.id}, cloud_percentage: {unprocessed_image.cloud_percentage}")
+                    else:
+                        print(f"Image for date {image_date} already exists (id: {unprocessed_image.id}), skipping")
+                else:
+                    print(f"Skipping incomplete task: {task_info.get('task_id', 'unknown')}")
         else:
             print("No new images to download")
 
@@ -185,22 +215,90 @@ def process_request(request_id):
 
             for image in all_images:
                 try:
-                    with BytesIO(image.image_file) as input_file, BytesIO() as output_file:
-                        predictor.process_image(input_file, output_file)
-                        output_file.seek(0)
-                        processed_image = output_file.getvalue()
-                    
-                    # Check if the processed image has any valid data
-                    with rasterio.MemoryFile(processed_image) as memfile:
-                        with memfile.open() as src:
-                            data = src.read(1)
-                            valid_data = data[data != -9999]
+                    # Check if this is sample data (JSON) or raster file
+                    import json
+                    try:
+                        # Try to parse as JSON (our new direct download format)
+                        # Handle both bytes and memoryview objects
+                        image_data = image.image_file
+                        if isinstance(image_data, memoryview):
+                            image_data = bytes(image_data)
+                        sample_data = json.loads(image_data.decode('utf-8'))
+                        print(f"Processing sample data for {image.image_date} with {len(sample_data['features'])} pixels")
+                        
+                        # Process sample data directly - create predictions for each pixel
+                        predictions = []
+                        predicted_points = []  # Store predictions with coordinates for map generation
+                        
+                        # Calculate temporal features from image date
+                        month = image.image_date.month
+                        season = (month % 12 + 3) // 3  # 1=Spring, 2=Summer, 3=Fall, 4=Winter
+                        
+                        for feature in sample_data['features']:
+                            pixel_data = feature['properties']
+                            # Create a feature vector from the spectral data (15 features total)
+                            feature_vector = [
+                                # Band columns (6)
+                                pixel_data.get('B2', 0), pixel_data.get('B3', 0), pixel_data.get('B4', 0),
+                                pixel_data.get('B5', 0), pixel_data.get('B8', 0), pixel_data.get('B11', 0),
+                                # Index columns (7)
+                                pixel_data.get('NDCI', 0), pixel_data.get('NDVI', 0), pixel_data.get('FAI', 0),
+                                pixel_data.get('MNDWI', 0), pixel_data.get('B3_B2_ratio', 0), 
+                                pixel_data.get('B4_B3_ratio', 0), pixel_data.get('B5_B4_ratio', 0),
+                                # Temporal columns (2)
+                                month, season
+                            ]
                             
-                            if len(valid_data) == 0:
-                                print(f"No valid data for image dated {image.image_date}. Skipping.")
-                                continue  # Skip to the next image
+                            # Use the ML model to predict water quality for this pixel
+                            prediction = predictor.predict_single_pixel(feature_vector)
+                            predictions.append(prediction)
+                            
+                            # Store prediction with coordinates for map generation
+                            if 'geometry' in feature and 'coordinates' in feature['geometry']:
+                                coords = feature['geometry']['coordinates']
+                                predicted_points.append({
+                                    'lon': coords[0],
+                                    'lat': coords[1],
+                                    'prediction': prediction
+                                })
+                        
+                        # Calculate average prediction for the image
+                        avg_prediction = sum(predictions) / len(predictions) if predictions else 0
+                        print(f"Average {model.parameter.name} prediction: {avg_prediction:.3f}")
+                        
+                        # For sample data, store the predictions with coordinates for map generation
+                        is_sample_data = True
+                        sample_result = {
+                            'type': 'sample_data',
+                            'points': predicted_points,
+                            'average': avg_prediction,
+                            'count': len(predictions),
+                            'parameter': model.parameter.name
+                        }
+                        processed_image = json.dumps(sample_result).encode('utf-8')
+                        
+                    except (json.JSONDecodeError, UnicodeDecodeError):
+                        # Fall back to raster processing for legacy data
+                        print(f"Processing raster file for {image.image_date}")
+                        is_sample_data = False
+                        with BytesIO(image.image_file) as input_file, BytesIO() as output_file:
+                            predictor.process_image(input_file, output_file)
+                            output_file.seek(0)
+                            processed_image = output_file.getvalue()
+                    
+                    # Only validate raster data if not sample-based
+                    if not is_sample_data:
+                        # Check if the processed image has any valid data
+                        with rasterio.MemoryFile(processed_image) as memfile:
+                            with memfile.open() as src:
+                                data = src.read(1)
+                                valid_data = data[data != -9999]
+                                
+                                if len(valid_data) == 0:
+                                    print(f"No valid data for image dated {image.image_date}. Skipping.")
+                                    continue  # Skip to the next image
 
-                    # If we have valid data, proceed with creating the analysis and maps
+                    # Create analysis record
                     analysis = Analysis.objects.create(
                         analysis_group=analysis_group,
                         identifier_code=uuid.uuid4(),
@@ -208,16 +306,33 @@ def process_request(request_id):
                         cloud_percentage=image.cloud_percentage
                     )
 
-                    map_generator = MapGenerator(processed_image, analysis.analysis_date)
-
-                    try:
-                        html_map = map_generator.create_interactive_map()
-                        static_map = map_generator.create_static_map()
-                        print(f"Successfully generated maps for image dated {image.image_date}")
-                    except Exception as e:
-                        print(f"Error generating maps: {str(e)}")
-                        html_map = None
-                        static_map = None
+                    # Generate maps based on data type
+                    html_map = None
+                    static_map = None
+                    
+                    if is_sample_data:
+                        # Generate maps from sample points
+                        print(f"Generating maps from sample data (date {image.image_date})")
+                        try:
+                            from .services.sample_map_generator import SampleMapGenerator
+                            sample_result = json.loads(processed_image.decode('utf-8'))
+                            map_generator = SampleMapGenerator(sample_result, analysis.analysis_date)
+                            html_map = map_generator.create_interactive_map()
+                            static_map = map_generator.create_static_map()
+                            print(f"Successfully generated maps from {len(sample_result['points'])} sample points")
+                        except Exception as e:
+                            print(f"Error generating maps from sample data: {str(e)}")
+                            import traceback
+                            traceback.print_exc()
+                    else:
+                        # Generate maps from raster data
+                        map_generator = MapGenerator(processed_image, analysis.analysis_date)
+                        try:
+                            html_map = map_generator.create_interactive_map()
+                            static_map = map_generator.create_static_map()
+                            print(f"Successfully generated maps for image dated {image.image_date}")
+                        except Exception as e:
+                            print(f"Error generating maps: {str(e)}")
 
                     analysis_ml_model = AnalysisMachineLearningModel.objects.create(
                         analysis=analysis,
