@@ -1,0 +1,137 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    BENCHMARK QUICK REFERENCE CARD                            ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌─ SETUP (One-time) ────────────────────────────────────────────────────────────┐
+│                                                                                │
+│  1. Export models from Docker:                                                │
+│     $ ./benchmark/export_models.sh                                            │
+│                                                                                │
+│  2. Install dependencies:                                                     │
+│     $ cd benchmark                                                            │
+│     $ pip install numpy pandas matplotlib scikit-learn joblib                 │
+│                                                                                │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ RUNNING ─────────────────────────────────────────────────────────────────────┐
+│                                                                                │
+│  $ cd benchmark                                                               │
+│  $ python benchmark.py                                                        │
+│                                                                                │
+│  ⏱️  Estimated time: 10-30 minutes                                             │
+│                                                                                │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ WHAT IT TESTS ───────────────────────────────────────────────────────────────┐
+│                                                                                │
+│  📊 STRONG SCALABILITY                                                        │
+│     Fixed problem, varying workers                                            │
+│     Sizes: 100, 400, 900, 1600 pixels                                         │
+│     Workers: 1, 2, 4, 6, 8                                                    │
+│     Ideal: Linear speedup (2x workers = 2x faster)                            │
+│                                                                                │
+│  📈 WEAK SCALABILITY                                                          │
+│     Problem scales with workers                                               │
+│     Base: 100 pixels per worker                                               │
+│     Ideal: Constant execution time                                            │
+│                                                                                │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ RESULTS ─────────────────────────────────────────────────────────────────────┐
+│                                                                                │
+│  📁 Location: benchmark/results/                                              │
+│                                                                                │
+│  📄 Files created:                                                            │
+│     • strong_scalability.csv        - Raw data                                │
+│     • weak_scalability.csv          - Raw data                                │
+│     • strong_scalability.png        - Plots (4 charts)                        │
+│     • weak_scalability.png          - Plots (4 charts)                        │
+│     • BENCHMARK_REPORT.md           - Summary tables                          │
+│     • benchmark_results.json        - Complete results                        │
+│                                                                                │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ METRICS ─────────────────────────────────────────────────────────────────────┐
+│                                                                                │
+│  ⏱️  Execution Time: How long to process all pixels                           │
+│                                                                                │
+│  🚀 Speedup = Sequential Time / Parallel Time                                 │
+│     Example: 10s seq, 2s parallel = 5.0x speedup                              │
+│                                                                                │
+│  ⚡ Efficiency = Speedup / Number of Workers                                   │
+│     Example: 5x speedup, 8 workers = 62.5% efficiency                         │
+│                                                                                │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ CUSTOMIZATION ───────────────────────────────────────────────────────────────┐
+│                                                                                │
+│  Edit benchmark.py (lines ~384-386):                                          │
+│                                                                                │
+│  strong_problem_sizes = [100, 400, 900, 1600]  # Change pixel counts          │
+│  worker_counts = [1, 2, 4, 6, 8]               # Change thread counts         │
+│  weak_base_size = 100                          # Change base size             │
+│                                                                                │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ MOCK DATA ───────────────────────────────────────────────────────────────────┐
+│                                                                                │
+│  Each pixel = 15 features:                                                    │
+│                                                                                │
+│  • 6 Spectral Bands: B2, B3, B4, B5, B8, B11                                  │
+│  • 7 Spectral Indices: NDCI, NDVI, FAI, MNDWI, B3/B2, B4/B3, B5/B4           │
+│  • 2 Temporal: Month, Season                                                  │
+│                                                                                │
+│  Realistic Sentinel-2 values (500-8000 reflectance units)                     │
+│                                                                                │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ TROUBLESHOOTING ─────────────────────────────────────────────────────────────┐
+│                                                                                │
+│  ❌ "Model files not found"                                                   │
+│     → Run: ./benchmark/export_models.sh                                       │
+│                                                                                │
+│  ❌ "Module not found"                                                        │
+│     → pip install numpy pandas matplotlib scikit-learn joblib                 │
+│                                                                                │
+│  ❌ "Docker error"                                                            │
+│     → cd .. && sudo docker-compose up -d                                      │
+│                                                                                │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ FILES ───────────────────────────────────────────────────────────────────────┐
+│                                                                                │
+│  benchmark/                                                                   │
+│  ├── benchmark.py           # Main benchmark script                           │
+│  ├── export_models.sh       # Export models from Docker                       │
+│  ├── setup_models.py        # Alternative export (Python)                     │
+│  ├── README.md              # Full documentation                              │
+│  ├── QUICKSTART.md          # Quick start guide                               │
+│  ├── models/                # Exported ML models (created by export)          │
+│  │   ├── model.pkl                                                            │
+│  │   └── scaler.pkl                                                           │
+│  └── results/               # Benchmark results (created by benchmark)        │
+│      ├── *.csv                                                                │
+│      ├── *.png                                                                │
+│      └── *.md                                                                 │
+│                                                                                │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ EXPECTED PERFORMANCE ────────────────────────────────────────────────────────┐
+│                                                                                │
+│  Workers │ Speedup  │ Efficiency                                              │
+│  ────────┼──────────┼────────────                                             │
+│     1    │  1.00x   │   100%                                                  │
+│     2    │  1.80x   │   90%                                                   │
+│     4    │  3.60x   │   90%                                                   │
+│     6    │  5.10x   │   85%                                                   │
+│     8    │  6.50x   │   81%                                                   │
+│                                                                                │
+│  (Typical ML workload with Python threading)                                  │
+│                                                                                │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  📖 Full docs: benchmark/README.md                                           ║
+║  🚀 Quick start: benchmark/QUICKSTART.md                                     ║
+║  📊 Summary: BENCHMARK_SUITE_SUMMARY.md                                      ║
+╚══════════════════════════════════════════════════════════════════════════════╝

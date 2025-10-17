@@ -1,0 +1,235 @@
+{
+  "strong_scalability": [
+    {
+      "test_type": "strong",
+      "problem_size": 100,
+      "n_workers": 1,
+      "sequential_time": 0.35541391372680664,
+      "parallel_time": 0.36586499214172363,
+      "speedup": 0.9714346039129412,
+      "efficiency": 0.9714346039129412
+    },
+    {
+      "test_type": "strong",
+      "problem_size": 100,
+      "n_workers": 2,
+      "sequential_time": 0.35541391372680664,
+      "parallel_time": 0.22165966033935547,
+      "speedup": 1.6034217195076303,
+      "efficiency": 0.8017108597538152
+    },
+    {
+      "test_type": "strong",
+      "problem_size": 100,
+      "n_workers": 4,
+      "sequential_time": 0.35541391372680664,
+      "parallel_time": 0.1660623550415039,
+      "speedup": 2.140243727351561,
+      "efficiency": 0.5350609318378903
+    },
+    {
+      "test_type": "strong",
+      "problem_size": 100,
+      "n_workers": 6,
+      "sequential_time": 0.35541391372680664,
+      "parallel_time": 0.14411401748657227,
+      "speedup": 2.4661994712618576,
+      "efficiency": 0.4110332452103096
+    },
+    {
+      "test_type": "strong",
+      "problem_size": 100,
+      "n_workers": 8,
+      "sequential_time": 0.35541391372680664,
+      "parallel_time": 0.16358041763305664,
+      "speedup": 2.1727167522219597,
+      "efficiency": 0.27158959402774496
+    },
+    {
+      "test_type": "strong",
+      "problem_size": 400,
+      "n_workers": 1,
+      "sequential_time": 1.4415898323059082,
+      "parallel_time": 1.4586470127105713,
+      "speedup": 0.9883061630017217,
+      "efficiency": 0.9883061630017217
+    },
+    {
+      "test_type": "strong",
+      "problem_size": 400,
+      "n_workers": 2,
+      "sequential_time": 1.4415898323059082,
+      "parallel_time": 0.8724517822265625,
+      "speedup": 1.6523432717701174,
+      "efficiency": 0.8261716358850587
+    },
+    {
+      "test_type": "strong",
+      "problem_size": 400,
+      "n_workers": 4,
+      "sequential_time": 1.4415898323059082,
+      "parallel_time": 0.4822678565979004,
+      "speedup": 2.9891891250547515,
+      "efficiency": 0.7472972812636879
+    },
+    {
+      "test_type": "strong",
+      "problem_size": 400,
+      "n_workers": 6,
+      "sequential_time": 1.4415898323059082,
+      "parallel_time": 0.3686800003051758,
+      "speedup": 3.9101384157335053,
+      "efficiency": 0.6516897359555842
+    },
+    {
+      "test_type": "strong",
+      "problem_size": 400,
+      "n_workers": 8,
+      "sequential_time": 1.4415898323059082,
+      "parallel_time": 0.3650672435760498,
+      "speedup": 3.9488336948138163,
+      "efficiency": 0.49360421185172704
+    },
+    {
+      "test_type": "strong",
+      "problem_size": 900,
+      "n_workers": 1,
+      "sequential_time": 3.049805164337158,
+      "parallel_time": 3.424281120300293,
+      "speedup": 0.8906410008970598,
+      "efficiency": 0.8906410008970598
+    },
+    {
+      "test_type": "strong",
+      "problem_size": 900,
+      "n_workers": 2,
+      "sequential_time": 3.049805164337158,
+      "parallel_time": 1.601154088973999,
+      "speedup": 1.9047543177380497,
+      "efficiency": 0.9523771588690249
+    },
+    {
+      "test_type": "strong",
+      "problem_size": 900,
+      "n_workers": 4,
+      "sequential_time": 3.049805164337158,
+      "parallel_time": 0.9317400455474854,
+      "speedup": 3.2732361122732567,
+      "efficiency": 0.8183090280683142
+    },
+    {
+      "test_type": "strong",
+      "problem_size": 900,
+      "n_workers": 6,
+      "sequential_time": 3.049805164337158,
+      "parallel_time": 0.70448899269104,
+      "speedup": 4.32910264883965,
+      "efficiency": 0.7215171081399417
+    },
+    {
+      "test_type": "strong",
+      "problem_size": 900,
+      "n_workers": 8,
+      "sequential_time": 3.049805164337158,
+      "parallel_time": 0.7805166244506836,
+      "speedup": 3.907418585073146,
+      "efficiency": 0.4884273231341433
+    },
+    {
+      "test_type": "strong",
+      "problem_size": 1600,
+      "n_workers": 1,
+      "sequential_time": 5.469925880432129,
+      "parallel_time": 6.689584732055664,
+      "speedup": 0.8176779425815357,
+      "efficiency": 0.8176779425815357
+    },
+    {
+      "test_type": "strong",
+      "problem_size": 1600,
+      "n_workers": 2,
+      "sequential_time": 5.469925880432129,
+      "parallel_time": 2.9644479751586914,
+      "speedup": 1.8451751983062936,
+      "efficiency": 0.9225875991531468
+    },
+    {
+      "test_type": "strong",
+      "problem_size": 1600,
+      "n_workers": 4,
+      "sequential_time": 5.469925880432129,
+      "parallel_time": 1.678114891052246,
+      "speedup": 3.2595657839626604,
+      "efficiency": 0.8148914459906651
+    },
+    {
+      "test_type": "strong",
+      "problem_size": 1600,
+      "n_workers": 6,
+      "sequential_time": 5.469925880432129,
+      "parallel_time": 1.4454820156097412,
+      "speedup": 3.7841535358880094,
+      "efficiency": 0.6306922559813349
+    },
+    {
+      "test_type": "strong",
+      "problem_size": 1600,
+      "n_workers": 8,
+      "sequential_time": 5.469925880432129,
+      "parallel_time": 1.3742413520812988,
+      "speedup": 3.980324032709309,
+      "efficiency": 0.4975405040886636
+    }
+  ],
+  "weak_scalability": [
+    {
+      "test_type": "weak",
+      "problem_size": 100,
+      "n_workers": 1,
+      "sequential_time": 0.5070750713348389,
+      "parallel_time": 0.5070750713348389,
+      "speedup": 1.0,
+      "efficiency": 1.0
+    },
+    {
+      "test_type": "weak",
+      "problem_size": 200,
+      "n_workers": 2,
+      "sequential_time": 0.5070750713348389,
+      "parallel_time": 0.4386582374572754,
+      "speedup": 1.1559684237873846,
+      "efficiency": 0.5779842118936923
+    },
+    {
+      "test_type": "weak",
+      "problem_size": 400,
+      "n_workers": 4,
+      "sequential_time": 0.5070750713348389,
+      "parallel_time": 0.5480916500091553,
+      "speedup": 0.9251647444845561,
+      "efficiency": 0.23129118612113903
+    },
+    {
+      "test_type": "weak",
+      "problem_size": 600,
+      "n_workers": 6,
+      "sequential_time": 0.5070750713348389,
+      "parallel_time": 0.651270866394043,
+      "speedup": 0.7785932052241374,
+      "efficiency": 0.1297655342040229
+    },
+    {
+      "test_type": "weak",
+      "problem_size": 800,
+      "n_workers": 8,
+      "sequential_time": 0.5070750713348389,
+      "parallel_time": 0.6670875549316406,
+      "speedup": 0.7601327105956894,
+      "efficiency": 0.09501658882446118
+    }
+  ],
+  "timestamp": "2025-10-16T23:54:59.786477",
+  "system_info": {
+    "cpu_count": 12
+  }
+}
