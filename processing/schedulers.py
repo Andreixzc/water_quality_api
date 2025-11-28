@@ -8,9 +8,9 @@ def start():
     scheduler = BackgroundScheduler(timezone=settings.TIME_ZONE)
     scheduler.add_jobstore(DjangoJobStore(), "default")
 
-    # Executa a tarefa a cada 5 minutos (to avoid Earth Engine rate limits)
+    # Executa a tarefa a cada 30 segundos (for testing)
     scheduler.add_job(
-        check_for_new_requests, "interval", minutes=5, jobstore="default"
+        check_for_new_requests, "interval", seconds=30, jobstore="default"
     )
 
     scheduler.start()
